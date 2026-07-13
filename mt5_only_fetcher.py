@@ -43,7 +43,7 @@ def save_candles(df, db_path):
 
 def fetch_mt5():
     try:
-        r = requests.get("http://127.0.0.1:5000/history?symbol=XAUUSD&count=5000", timeout=10)
+        r = requests.get("http://127.0.0.1:5000/history?symbol=XAUUSD&count=10000", timeout=10)
         if r.status_code == 200:
             data = r.json()
             if data:

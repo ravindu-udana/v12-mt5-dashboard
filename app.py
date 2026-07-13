@@ -27,10 +27,10 @@ connected_clients = []
 last_processed_candle_time = None
 
 def get_latest_mt5_data():
-    """Fetches last 600 candles from the MT5 database."""
+    """Fetches last 10000 candles from the MT5 database."""
     try:
         conn = sqlite3.connect('/home/ubuntu/mt5_gold.db')
-        df = pd.read_sql_query("SELECT * FROM candles ORDER BY unix_time DESC LIMIT 600", conn)
+        df = pd.read_sql_query("SELECT * FROM candles ORDER BY unix_time DESC LIMIT 10000", conn)
         conn.close()
         
         if df.empty:
