@@ -35,6 +35,16 @@ def init_db():
         cursor.execute("ALTER TABLE signals ADD COLUMN status TEXT DEFAULT 'PENDING'")
     except sqlite3.OperationalError:
         pass
+        
+    # Manual Engulfings table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS manual_engulfings (
+            c_time INTEGER PRIMARY KEY,
+            c_open REAL, c_high REAL, c_low REAL, c_close REAL, c_volume REAL,
+            b_time INTEGER, b_open REAL, b_high REAL, b_low REAL, b_close REAL, b_volume REAL,
+            a_time INTEGER, a_open REAL, a_high REAL, a_low REAL, a_close REAL, a_volume REAL
+        )
+    ''')
     
     conn.commit()
     conn.close()
@@ -113,3 +123,36 @@ def get_all_signals():
             'status': row[3]
         })
     return signals
+
+def toggle_manual_engulfing(a, b, c):
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT c_time FROM manual_engulfings WHERE c_time = ?", (c['time'],))
+    row = cursor.fetchone()
+    
+    if row:
+        cursor.execute("DELETE FROM manual_engulfings WHERE c_time = ?", (c['time'],))
+        action = "deleted"
+    else:
+        cursor.execute('''
+            INSERT INTO manual_engulfings (
+                c_time, c_open, c_high, c_low, c_close, c_volume,
+                b_time, b_open, b_high, b_low, b_close, b_volume,
+                a_time, a_open, a_high, a_low, a_close, a_volume
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            c['time'], c['open'], c['high'], c['low'], c['close'], c.get('value', c.get('volume', 0)),
+            b['time'], b['open'], b['high'], b['low'], b['close'], b.get('value', b.get('volume', 0)),
+            a['time'], a['open'], a['high'], a['low'], a['close'], a.get('value', a.get('volume', 0))
+        ))
+        action = "inserted"
+        
+    conn.commit()
+    conn.close()
+    return action
+
+def get_manual_engulfings():
+    conn = sqlite3.connect(DB_FILE)
+    df = pd.read_sql_query("SELECT * FROM manual_engulfings", conn)
+    conn.close()
+    return df.to_dict(orient='records')

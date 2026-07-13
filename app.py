@@ -82,12 +82,32 @@ async def websocket_endpoint(websocket: WebSocket):
         history_signals = database.get_all_signals()
         await websocket.send_text(json.dumps({'type': 'history_signals', 'data': history_signals}))
         
+        # Send manual engulfings
+        manual = database.get_manual_engulfings()
+        await websocket.send_text(json.dumps({'type': 'manual_update', 'data': manual}))
+        
     except Exception as e:
         print(f"WS Error: {e}")
         
     try:
         while True:
-            await asyncio.sleep(1)
+            data = await websocket.receive_text()
+            try:
+                msg = json.loads(data)
+                
+                if msg.get('type') == 'toggle_manual':
+                    database.toggle_manual_engulfing(
+                        msg['data']['a'], msg['data']['b'], msg['data']['c']
+                    )
+                    # Broadcast to all clients
+                    broadcast_msg = json.dumps({'type': 'manual_update', 'data': database.get_manual_engulfings()})
+                    for client in connected_clients:
+                        try:
+                            await client.send_text(broadcast_msg)
+                        except:
+                            pass
+            except Exception as e:
+                print(f"Error processing message: {e}")
     except:
         connected_clients.remove(websocket)
 

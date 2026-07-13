@@ -1,0 +1,249 @@
+function updateManualMarkers() {
+                try {
+                    if (!manualSetups.length || !allCandles.length) {
+                        candleSeries.setMarkers([]);
+                        manualMarkers = [];
+                        drawPositionBoxes();
+                        return;
+                    }
+                    manualMarkers = manualSetups.map(m => {
+                        const isBullish = m.c_close > m.c_open;
+                        const entry = m.c_close;
+                        let sl, tp;
+                        if (isBullish) {
+                            sl = m.b_low;
+                            tp = entry + 2 * (entry - sl);
+                        } else {
+                            sl = m.b_high;
+                            tp = entry - 2 * (sl - entry);
+                        }
+                        
+                        let status = '';
+                        let tradeEndTime = allCandles[allCandles.length - 1].time; // default to latest candle if still open
+                        
+                        const cIdx = allCandles.findIndex(c => c.time === m.c_time);
+                        if (cIdx !== -1) {
+                            for (let i = cIdx + 1; i < allCandles.length; i++) {
+                                const cdl = allCandles[i];
+                                if (isBullish) {
+                                    if (cdl.low <= sl) { status = 'LOST'; tradeEndTime = cdl.time; break; }
+                                    if (cdl.high >= tp) { status = 'WON'; tradeEndTime = cdl.time; break; }
+                                } else {
+                                    if (cdl.high >= sl) { status = 'LOST'; tradeEndTime = cdl.time; break; }
+                                    if (cdl.low <= tp) { status = 'WON'; tradeEndTime = cdl.time; break; }
+                                }
+                            }
+                        }
+                        
+                        let text = isBullish ? 'BUY' : 'SELL';
+                        if (status === 'WON') text += ' ✅';
+                        else if (status === 'LOST') text += ' ❌';
+                        
+                        return {
+                            time: toLocal(m.c_time),
+                            position: isBullish ? 'belowBar' : 'aboveBar',
+                            color: '#FFD700',
+                            shape: isBullish ? 'arrowUp' : 'arrowDown',
+                            text: text,
+                            // Extra properties for drawPositions overlay:
+                            isBullish: isBullish,
+                            entry: entry,
+                            sl: sl,
+                            tp: tp,
+                            endTimeLocal: toLocal(tradeEndTime)
+                        };
+                    });
+                    
+                    manualMarkers.sort((a, b) => a.time - b.time);
+                    candleSeries.setMarkers(manualMarkers);
+                    drawPositionBoxes();
+                } catch(e) {
+                    console.error('updateManualMarkers error:', e);
+                }
+            }
+            
+            // --- Visual Trade Position Boxes (TradingView style) ---
+            let showPositions = false;
+            
+            // Load settings from localStorage or use defaults
+            const savedSettings = localStorage.getItem('posSettings');
+            let posSettings = savedSettings ? JSON.parse(savedSettings) : {
+                thick: true,
+                outer: true,
+                prices: true,
+                dash: true,
+                rr15: false
+            };
+            
+            // Set initial checkbox states
+            ['thick', 'outer', 'prices', 'dash', 'rr15'].forEach(key => {
+                const cb = document.getElementById('set-' + key);
+                if (cb) cb.checked = posSettings[key];
+            });
+            
+            const posBtn = document.getElementById('toggle-positions-btn');
+            const posSettingsBtn = document.getElementById('pos-settings-btn');
+            const posSettingsMenu = document.getElementById('pos-settings-menu');
+            
+            // Create overlay div INSIDE #tvchart via JS (no HTML changes needed)
+            const tradeOverlay = document.createElement('div');
+            tradeOverlay.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:3;overflow:hidden;';
+            chartContainer.style.position = 'relative';
+            chartContainer.appendChild(tradeOverlay);
+            
+            posBtn.addEventListener('click', () => {
+                showPositions = !showPositions;
+                posBtn.style.background = showPositions ? 'rgba(38,166,154,0.5)' : 'rgba(38,166,154,0.2)';
+                posBtn.style.color = showPositions ? '#fff' : 'var(--text-secondary)';
+                posSettingsBtn.style.background = posBtn.style.background; // Match color
+                drawPositionBoxes();
+            });
+            
+            posSettingsBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                posSettingsMenu.style.display = posSettingsMenu.style.display === 'none' ? 'block' : 'none';
+            });
+            
+            document.addEventListener('click', (e) => {
+                if (!posSettingsMenu.contains(e.target) && e.target !== posSettingsBtn) {
+                    posSettingsMenu.style.display = 'none';
+                }
+            });
+            
+            ['thick', 'outer', 'prices', 'dash', 'rr15'].forEach(key => {
+                document.getElementById('set-' + key).addEventListener('change', (e) => {
+                    posSettings[key] = e.target.checked;
+                    localStorage.setItem('posSettings', JSON.stringify(posSettings));
+                    drawPositionBoxes();
+                });
+            });
+            
+            function drawPositionBoxes() {
+                if (!showPositions || !manualMarkers.length) {
+                    tradeOverlay.innerHTML = '';
+                    return;
+                }
+                
+                let html = '';
+                
+                manualMarkers.forEach(m => {
+                    const x1 = chart.timeScale().timeToCoordinate(m.time);
+                    let x2 = chart.timeScale().timeToCoordinate(m.endTimeLocal);
+                    
+                    if (x1 === null) return;
+                    if (x2 === null) x2 = chart.timeScale().width();
+                    if (x2 <= x1) x2 = x1 + 20;
+                    
+                    const yEntry = candleSeries.priceToCoordinate(m.entry);
+                    const yTP = candleSeries.priceToCoordinate(m.tp);
+                    const ySL = candleSeries.priceToCoordinate(m.sl);
+                    
+                    if (yEntry === null || yTP === null || ySL === null) return;
+                    
+                    const w = x2 - x1;
+                    
+                    // TP box (green zone)
+                    const tpTop = Math.min(yEntry, yTP);
+                    const tpH = Math.abs(yEntry - yTP);
+                    
+                    const thickTp = posSettings.thick ? 'border-left:3px solid #26a69a;' : '';
+                    const borderTp = posSettings.outer ? 'border:1px solid rgba(38,166,154,0.5);' : '';
+                    
+                    html += `<div style="position:absolute;left:${x1}px;top:${tpTop}px;width:${w}px;height:${tpH}px;background:rgba(38,166,154,0.18);${borderTp}${thickTp}box-sizing:border-box;"></div>`;
+                    
+                    if (posSettings.prices) {
+                        html += `<div style="position:absolute;left:${x1+4}px;top:${Math.min(yEntry,yTP)+2}px;color:#26a69a;font-size:10px;font-weight:700;">TP ${m.tp.toFixed(2)}</div>`;
+                    }
+                    
+                    // SL box (red zone)
+                    const slTop = Math.min(yEntry, ySL);
+                    const slH = Math.abs(yEntry - ySL);
+                    
+                    const thickSl = posSettings.thick ? 'border-left:3px solid #ef5350;' : '';
+                    const borderSl = posSettings.outer ? 'border:1px solid rgba(239,83,80,0.5);' : '';
+                    
+                    html += `<div style="position:absolute;left:${x1}px;top:${slTop}px;width:${w}px;height:${slH}px;background:rgba(239,83,80,0.18);${borderSl}${thickSl}box-sizing:border-box;"></div>`;
+                    
+                    if (posSettings.prices) {
+                        html += `<div style="position:absolute;left:${x1+4}px;top:${Math.max(yEntry,ySL)-14}px;color:#ef5350;font-size:10px;font-weight:700;">SL ${m.sl.toFixed(2)}</div>`;
+                    }
+                    
+                    // Entry line
+                    if (posSettings.dash) {
+                        html += `<div style="position:absolute;left:${x1}px;top:${yEntry}px;width:${w}px;height:0;border-top:1px dashed #FFD700;"></div>`;
+                    }
+                    
+                    if (posSettings.prices) {
+                        html += `<div style="position:absolute;left:${x1+4}px;top:${yEntry-14}px;color:#FFD700;font-size:10px;font-weight:700;">${m.isBullish ? 'BUY' : 'SELL'} ${m.entry.toFixed(2)}</div>`;
+                    }
+                    
+                    // 1:1.5 R:R Line
+                    if (posSettings.rr15) {
+                        const rr15Price = m.isBullish ? m.entry + 1.5 * (m.entry - m.sl) : m.entry - 1.5 * (m.sl - m.entry);
+                        const yRR = candleSeries.priceToCoordinate(rr15Price);
+                        if (yRR !== null && yRR >= Math.min(yTP, ySL) && yRR <= Math.max(yTP, ySL)) {
+                            html += `<div style="position:absolute;left:${x1}px;top:${yRR}px;width:${w}px;height:0;border-top:1px dashed rgba(255,255,255,0.4);"></div>`;
+                            if (posSettings.prices) {
+                                html += `<div style="position:absolute;left:${x1+4}px;top:${yRR+2}px;color:rgba(255,255,255,0.6);font-size:10px;font-weight:700;">1.5 R:R (${rr15Price.toFixed(2)})</div>`;
+                            }
+                        }
+                    }
+                });
+                
+                tradeOverlay.innerHTML = html;
+            }
+            
+            // Sync boxes with chart pan/zoom
+            chart.timeScale().subscribeVisibleTimeRangeChange(drawPositionBoxes);
+            chart.timeScale().subscribeVisibleLogicalRangeChange(drawPositionBoxes);
+            
+            let currentCrosshairTime = null;
+            chart.subscribeCrosshairMove((param) => {
+                if (param.time) {
+                    currentCrosshairTime = param.time;
+                }
+            });
+            
+            function optimisticToggle(a, b, c) {
+                if (ws.readyState === WebSocket.OPEN) {
+                    const existingIdx = manualSetups.findIndex(m => m.c_time === c.time);
+                    if (existingIdx !== -1) {
+                        manualSetups.splice(existingIdx, 1);
+                    } else {
+                        manualSetups.push({
+                            c_time: c.time, c_open: c.open, c_high: c.high, c_low: c.low, c_close: c.close,
+                            b_time: b.time, b_open: b.open, b_high: b.high, b_low: b.low, b_close: b.close,
+                            a_time: a.time, a_open: a.open, a_high: a.high, a_low: a.low, a_close: a.close
+                        });
+                    }
+                    updateManualMarkers();
+                    
+                    ws.send(JSON.stringify({
+                        type: 'toggle_manual',
+                        data: { a, b, c }
+                    }));
+                }
+            }
+
+            document.getElementById('mobile-mark-btn').addEventListener('click', () => {
+                if (currentCrosshairTime) {
+                    const dbTime = currentCrosshairTime - tzOffset;
+                    
+                    const cIdx = allCandles.findIndex(c => c.time === dbTime);
+                    if (cIdx >= 2) {
+                        optimisticToggle(allCandles[cIdx-2], allCandles[cIdx-1], allCandles[cIdx]);
+                    }
+                }
+            });
+            
+            chart.subscribeClick((param) => {
+                if (!param.time) return;
+                const dbTime = param.time - tzOffset;
+                
+                const cIdx = allCandles.findIndex(c => c.time === dbTime);
+                if (cIdx >= 2) {
+                    optimisticToggle(allCandles[cIdx-2], allCandles[cIdx-1], allCandles[cIdx]);
+                }
+            });
+
+            
