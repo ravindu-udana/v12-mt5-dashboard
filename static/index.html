@@ -46,6 +46,15 @@
             <header class="chart-header">
                 <h2>XAUUSD (Gold) <span class="timeframe">1m</span></h2>
                 <div class="header-right">
+                    <button id="toggle-positions-btn" style="background:rgba(38,166,154,0.2);border:1px solid rgba(38,166,154,0.3);color:var(--text-secondary,#888);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;font-family:Inter;">Positions</button>
+                    <button id="pos-settings-btn" style="background:rgba(38,166,154,0.2);border:1px solid rgba(38,166,154,0.3);color:var(--text-secondary,#888);padding:4px 6px;border-radius:4px;cursor:pointer;font-size:11px;">&#9881;</button>
+                    <div id="pos-settings-menu" style="display:none;position:absolute;right:10px;top:40px;background:#1a1d26;border:1px solid rgba(42,46,57,0.8);border-radius:6px;padding:8px 12px;z-index:100;font-size:12px;color:#c8c8c8;">
+                        <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-thick" checked> Thick border</label>
+                        <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-outer" checked> Outer border</label>
+                        <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-prices" checked> Show prices</label>
+                        <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-dash" checked> Entry dash</label>
+                        <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-rr15"> 1.5 R:R line</label>
+                    </div>
                     <div id="candle-countdown" class="countdown">00:00</div>
                     <div class="live-pulse">LIVE</div>
                 </div>
@@ -124,16 +133,18 @@
                         }
                         
                         let status = '';
+                        let tradeEndTime = allCandles[allCandles.length - 1].time;
+                        
                         const cIdx = allCandles.findIndex(c => c.time === m.c_time);
                         if (cIdx !== -1) {
                             for (let i = cIdx + 1; i < allCandles.length; i++) {
                                 const cdl = allCandles[i];
                                 if (isBullish) {
-                                    if (cdl.low <= sl) { status = 'LOST'; break; }
-                                    if (cdl.high >= tp) { status = 'WON'; break; }
+                                    if (cdl.low <= sl) { status = 'LOST'; tradeEndTime = cdl.time; break; }
+                                    if (cdl.high >= tp) { status = 'WON'; tradeEndTime = cdl.time; break; }
                                 } else {
-                                    if (cdl.high >= sl) { status = 'LOST'; break; }
-                                    if (cdl.low <= tp) { status = 'WON'; break; }
+                                    if (cdl.high >= sl) { status = 'LOST'; tradeEndTime = cdl.time; break; }
+                                    if (cdl.low <= tp) { status = 'WON'; tradeEndTime = cdl.time; break; }
                                 }
                             }
                         }
@@ -148,11 +159,17 @@
                             color: '#FFD700',
                             shape: isBullish ? 'arrowUp' : 'arrowDown',
                             text: text,
+                            isBullish: isBullish,
+                            entry: entry,
+                            sl: sl,
+                            tp: tp,
+                            endTimeLocal: toLocal(tradeEndTime)
                         };
                     });
                     
                     manualMarkers.sort((a, b) => a.time - b.time);
                     candleSeries.setMarkers(manualMarkers);
+                    drawPositionBoxes();
                     updateManualTable(manualSetups);
                 } catch(e) {
                     console.error('updateManualMarkers error:', e);
@@ -202,6 +219,129 @@
                 }
             }
 
+            // --- Visual Trade Position Boxes ---
+            let showPositions = false;
+            
+            const savedSettings = localStorage.getItem('posSettings');
+            let posSettings = savedSettings ? JSON.parse(savedSettings) : {
+                thick: true, outer: true, prices: true, dash: true, rr15: false
+            };
+            
+            ['thick', 'outer', 'prices', 'dash', 'rr15'].forEach(key => {
+                const cb = document.getElementById('set-' + key);
+                if (cb) cb.checked = posSettings[key];
+            });
+            
+            const posBtn = document.getElementById('toggle-positions-btn');
+            const posSettingsBtn = document.getElementById('pos-settings-btn');
+            const posSettingsMenu = document.getElementById('pos-settings-menu');
+            
+            const tradeOverlay = document.createElement('div');
+            tradeOverlay.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:3;overflow:hidden;';
+            chartContainer.style.position = 'relative';
+            chartContainer.appendChild(tradeOverlay);
+            
+            posBtn.addEventListener('click', () => {
+                showPositions = !showPositions;
+                posBtn.style.background = showPositions ? 'rgba(38,166,154,0.5)' : 'rgba(38,166,154,0.2)';
+                posBtn.style.color = showPositions ? '#fff' : 'var(--text-secondary, #888)';
+                drawPositionBoxes();
+            });
+            
+            posSettingsBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                posSettingsMenu.style.display = posSettingsMenu.style.display === 'none' ? 'block' : 'none';
+            });
+            
+            document.addEventListener('click', (e) => {
+                if (!posSettingsMenu.contains(e.target) && e.target !== posSettingsBtn) {
+                    posSettingsMenu.style.display = 'none';
+                }
+            });
+            
+            ['thick', 'outer', 'prices', 'dash', 'rr15'].forEach(key => {
+                document.getElementById('set-' + key).addEventListener('change', (e) => {
+                    posSettings[key] = e.target.checked;
+                    localStorage.setItem('posSettings', JSON.stringify(posSettings));
+                    drawPositionBoxes();
+                });
+            });
+            
+            function drawPositionBoxes() {
+                if (!showPositions || !manualMarkers.length) {
+                    tradeOverlay.innerHTML = '';
+                    return;
+                }
+                
+                let html = '';
+                
+                manualMarkers.forEach(m => {
+                    const x1 = chart.timeScale().timeToCoordinate(m.time);
+                    let x2 = chart.timeScale().timeToCoordinate(m.endTimeLocal);
+                    
+                    if (x1 === null) return;
+                    if (x2 === null) x2 = chart.timeScale().width();
+                    if (x2 <= x1) x2 = x1 + 20;
+                    
+                    const yEntry = candleSeries.priceToCoordinate(m.entry);
+                    const yTP = candleSeries.priceToCoordinate(m.tp);
+                    const ySL = candleSeries.priceToCoordinate(m.sl);
+                    
+                    if (yEntry === null || yTP === null || ySL === null) return;
+                    
+                    const w = x2 - x1;
+                    
+                    // TP box (green zone)
+                    const tpTop = Math.min(yEntry, yTP);
+                    const tpH = Math.abs(yEntry - yTP);
+                    const thickTp = posSettings.thick ? 'border-left:3px solid #26a69a;' : '';
+                    const borderTp = posSettings.outer ? 'border:1px solid rgba(38,166,154,0.5);' : '';
+                    html += `<div style="position:absolute;left:${x1}px;top:${tpTop}px;width:${w}px;height:${tpH}px;background:rgba(38,166,154,0.18);${borderTp}${thickTp}box-sizing:border-box;"></div>`;
+                    
+                    if (posSettings.prices) {
+                        html += `<div style="position:absolute;left:${x1+4}px;top:${Math.min(yEntry,yTP)+2}px;color:#26a69a;font-size:10px;font-weight:700;">TP ${m.tp.toFixed(2)}</div>`;
+                    }
+                    
+                    // SL box (red zone)
+                    const slTop = Math.min(yEntry, ySL);
+                    const slH = Math.abs(yEntry - ySL);
+                    const thickSl = posSettings.thick ? 'border-left:3px solid #ef5350;' : '';
+                    const borderSl = posSettings.outer ? 'border:1px solid rgba(239,83,80,0.5);' : '';
+                    html += `<div style="position:absolute;left:${x1}px;top:${slTop}px;width:${w}px;height:${slH}px;background:rgba(239,83,80,0.18);${borderSl}${thickSl}box-sizing:border-box;"></div>`;
+                    
+                    if (posSettings.prices) {
+                        html += `<div style="position:absolute;left:${x1+4}px;top:${Math.max(yEntry,ySL)-14}px;color:#ef5350;font-size:10px;font-weight:700;">SL ${m.sl.toFixed(2)}</div>`;
+                    }
+                    
+                    // Entry line
+                    if (posSettings.dash) {
+                        html += `<div style="position:absolute;left:${x1}px;top:${yEntry}px;width:${w}px;height:0;border-top:1px dashed #FFD700;"></div>`;
+                    }
+                    
+                    if (posSettings.prices) {
+                        html += `<div style="position:absolute;left:${x1+4}px;top:${yEntry-14}px;color:#FFD700;font-size:10px;font-weight:700;">${m.isBullish ? 'BUY' : 'SELL'} ${m.entry.toFixed(2)}</div>`;
+                    }
+                    
+                    // 1:1.5 R:R Line
+                    if (posSettings.rr15) {
+                        const rr15Price = m.isBullish ? m.entry + 1.5 * (m.entry - m.sl) : m.entry - 1.5 * (m.sl - m.entry);
+                        const yRR = candleSeries.priceToCoordinate(rr15Price);
+                        if (yRR !== null && yRR >= Math.min(yTP, ySL) && yRR <= Math.max(yTP, ySL)) {
+                            html += `<div style="position:absolute;left:${x1}px;top:${yRR}px;width:${w}px;height:0;border-top:1px dashed rgba(255,255,255,0.4);"></div>`;
+                            if (posSettings.prices) {
+                                html += `<div style="position:absolute;left:${x1+4}px;top:${yRR+2}px;color:rgba(255,255,255,0.6);font-size:10px;font-weight:700;">1.5 R:R (${rr15Price.toFixed(2)})</div>`;
+                            }
+                        }
+                    }
+                });
+                
+                tradeOverlay.innerHTML = html;
+            }
+            
+            // Sync boxes with chart pan/zoom
+            chart.timeScale().subscribeVisibleTimeRangeChange(drawPositionBoxes);
+            chart.timeScale().subscribeVisibleLogicalRangeChange(drawPositionBoxes);
+            
             chart.subscribeClick((param) => {
                 if (!param.time) return;
                 const dbTime = param.time + tzOffset;
