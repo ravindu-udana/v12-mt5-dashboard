@@ -30,6 +30,15 @@
                     <span id="mt5-text">MT5 Stream Offline</span>
                 </div>
             </div>
+
+            <!-- Manual Engulfing Table -->
+            <div class="status-card" style="margin-top:12px;">
+                <h3>Manual Engulfings</h3>
+                <table id="manual-table" style="width:100%; font-size:12px; color:#c8c8c8;">
+                    <thead><tr><th style="text-align:left;padding:4px;">Time</th><th style="text-align:left;padding:4px;">Type</th><th style="text-align:left;padding:4px;">Price</th></tr></thead>
+                    <tbody><tr class="empty-row"><td colspan="3" style="text-align:center; padding:10px; color:rgba(255,255,255,0.3);">Click candle to mark</td></tr></tbody>
+                </table>
+            </div>
         </aside>
 
         <!-- Main Chart Area -->
@@ -52,7 +61,6 @@
             setInterval(() => {
                 const now = new Date();
                 const secondsLeft = 60 - now.getSeconds();
-                // If it hits 60, display as 00:00 (new candle forming)
                 const displaySecs = secondsLeft === 60 ? 0 : secondsLeft;
                 countdownEl.innerText = `00:${displaySecs.toString().padStart(2, '0')}`;
             }, 1000);
@@ -62,73 +70,45 @@
             const chart = LightweightCharts.createChart(chartContainer, {
                 width: chartContainer.clientWidth,
                 height: chartContainer.clientHeight,
-                layout: {
-                    backgroundColor: '#0B0E14',
-                    textColor: '#D1D4DC',
-                },
-                grid: {
-                    vertLines: { color: 'rgba(42, 46, 57, 0.5)' },
-                    horzLines: { color: 'rgba(42, 46, 57, 0.5)' },
-                },
-                crosshair: {
-                    mode: LightweightCharts.CrosshairMode.Normal,
-                },
-                rightPriceScale: {
-                    borderColor: 'rgba(197, 203, 206, 0.8)',
-                },
-                timeScale: {
-                    borderColor: 'rgba(197, 203, 206, 0.8)',
-                    timeVisible: true,
-                    secondsVisible: false,
-                },
+                layout: { background: { type: 'solid', color: '#0B0E14' }, textColor: '#d1d4dc', fontSize: 12, fontFamily: 'Inter' },
+                grid: { vertLines: { color: 'rgba(42, 46, 57, 0.3)' }, horzLines: { color: 'rgba(42, 46, 57, 0.3)' } },
+                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                rightPriceScale: { borderColor: 'rgba(42, 46, 57, 0.5)' },
+                timeScale: { borderColor: 'rgba(42, 46, 57, 0.5)', timeVisible: true, secondsVisible: false },
             });
-
-            // Handle resize
-            window.addEventListener('resize', () => {
-                chart.resize(chartContainer.clientWidth, chartContainer.clientHeight);
-            });
+            window.addEventListener('resize', () => { chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight }); });
 
             const candleSeries = chart.addCandlestickSeries({
-                upColor: '#26a69a',
-                downColor: '#ef5350',
-                borderVisible: false,
-                wickUpColor: '#26a69a',
-                wickDownColor: '#ef5350',
+                upColor: '#26a69a', downColor: '#ef5350', borderDownColor: '#ef5350', borderUpColor: '#26a69a',
+                wickDownColor: '#ef5350', wickUpColor: '#26a69a',
             });
 
             const volumeSeries = chart.addHistogramSeries({
                 color: '#26a69a',
-                priceFormat: {
-                    type: 'volume',
-                },
+                priceFormat: { type: 'volume' },
                 priceScaleId: '',
-                scaleMargins: {
-                    top: 0.8,
-                    bottom: 0,
-                },
+                scaleMargins: { top: 0.8, bottom: 0 },
             });
 
             const smaSeries = chart.addLineSeries({
-                color: 'rgba(255, 193, 7, 0.8)',
-                lineWidth: 2,
-                title: '200 SMA',
-                crosshairMarkerVisible: false,
-                priceLineVisible: false
+                color: 'rgba(255, 193, 7, 0.8)', lineWidth: 2, title: '200 SMA',
+                crosshairMarkerVisible: false, priceLineVisible: false
             });
 
             let markers = [];
             let allCandles = [];
-            
-            function toLocal(time) { return time - tzOffset; }
             let manualSetups = [];
             let manualMarkers = [];
+            const tzOffset = new Date().getTimezoneOffset() * 60;
+            function toLocal(time) { return time - tzOffset; }
 
+            // --- Manual Engulfing Functions ---
             function updateManualMarkers() {
                 try {
                     if (!manualSetups.length || !allCandles.length) {
                         candleSeries.setMarkers([]);
                         manualMarkers = [];
-                        drawPositionBoxes();
+                        updateManualTable([]);
                         return;
                     }
                     manualMarkers = manualSetups.map(m => {
@@ -144,18 +124,16 @@
                         }
                         
                         let status = '';
-                        let tradeEndTime = allCandles[allCandles.length - 1].time; // default to latest candle if still open
-                        
                         const cIdx = allCandles.findIndex(c => c.time === m.c_time);
                         if (cIdx !== -1) {
                             for (let i = cIdx + 1; i < allCandles.length; i++) {
                                 const cdl = allCandles[i];
                                 if (isBullish) {
-                                    if (cdl.low <= sl) { status = 'LOST'; tradeEndTime = cdl.time; break; }
-                                    if (cdl.high >= tp) { status = 'WON'; tradeEndTime = cdl.time; break; }
+                                    if (cdl.low <= sl) { status = 'LOST'; break; }
+                                    if (cdl.high >= tp) { status = 'WON'; break; }
                                 } else {
-                                    if (cdl.high >= sl) { status = 'LOST'; tradeEndTime = cdl.time; break; }
-                                    if (cdl.low <= tp) { status = 'WON'; tradeEndTime = cdl.time; break; }
+                                    if (cdl.high >= sl) { status = 'LOST'; break; }
+                                    if (cdl.low <= tp) { status = 'WON'; break; }
                                 }
                             }
                         }
@@ -170,165 +148,39 @@
                             color: '#FFD700',
                             shape: isBullish ? 'arrowUp' : 'arrowDown',
                             text: text,
-                            // Extra properties for drawPositions overlay:
-                            isBullish: isBullish,
-                            entry: entry,
-                            sl: sl,
-                            tp: tp,
-                            endTimeLocal: toLocal(tradeEndTime)
                         };
                     });
                     
                     manualMarkers.sort((a, b) => a.time - b.time);
                     candleSeries.setMarkers(manualMarkers);
-                    drawPositionBoxes();
+                    updateManualTable(manualSetups);
                 } catch(e) {
                     console.error('updateManualMarkers error:', e);
                 }
             }
-            
-            // --- Visual Trade Position Boxes (TradingView style) ---
-            let showPositions = false;
-            
-            // Load settings from localStorage or use defaults
-            const savedSettings = localStorage.getItem('posSettings');
-            let posSettings = savedSettings ? JSON.parse(savedSettings) : {
-                thick: true,
-                outer: true,
-                prices: true,
-                dash: true,
-                rr15: false
-            };
-            
-            // Set initial checkbox states
-            ['thick', 'outer', 'prices', 'dash', 'rr15'].forEach(key => {
-                const cb = document.getElementById('set-' + key);
-                if (cb) cb.checked = posSettings[key];
-            });
-            
-            const posBtn = document.getElementById('toggle-positions-btn');
-            const posSettingsBtn = document.getElementById('pos-settings-btn');
-            const posSettingsMenu = document.getElementById('pos-settings-menu');
-            
-            // Create overlay div INSIDE #tvchart via JS (no HTML changes needed)
-            const tradeOverlay = document.createElement('div');
-            tradeOverlay.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:3;overflow:hidden;';
-            chartContainer.style.position = 'relative';
-            chartContainer.appendChild(tradeOverlay);
-            
-            posBtn.addEventListener('click', () => {
-                showPositions = !showPositions;
-                posBtn.style.background = showPositions ? 'rgba(38,166,154,0.5)' : 'rgba(38,166,154,0.2)';
-                posBtn.style.color = showPositions ? '#fff' : 'var(--text-secondary)';
-                posSettingsBtn.style.background = posBtn.style.background; // Match color
-                drawPositionBoxes();
-            });
-            
-            posSettingsBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                posSettingsMenu.style.display = posSettingsMenu.style.display === 'none' ? 'block' : 'none';
-            });
-            
-            document.addEventListener('click', (e) => {
-                if (!posSettingsMenu.contains(e.target) && e.target !== posSettingsBtn) {
-                    posSettingsMenu.style.display = 'none';
+
+            function updateManualTable(data) {
+                const tbody = document.querySelector('#manual-table tbody');
+                if (!data || data.length === 0) {
+                    tbody.innerHTML = '<tr class="empty-row"><td colspan="3" style="text-align:center; padding:10px; color:rgba(255,255,255,0.3);">Click candle to mark</td></tr>';
+                } else {
+                    tbody.innerHTML = '';
+                    const sorted = [...data].sort((a,b) => b.c_time - a.c_time);
+                    sorted.forEach(m => {
+                        const isBullish = m.c_close > m.c_open;
+                        const typeText = isBullish ? '<span style="color:#26a69a; font-weight:bold;">BULL</span>' : '<span style="color:#ef5350; font-weight:bold;">BEAR</span>';
+                        const dateStr = new Date(m.c_time * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        tbody.innerHTML += `
+                            <tr style="border-bottom: 1px solid rgba(42, 46, 57, 0.5);">
+                                <td style="padding: 6px 4px;">${dateStr}</td>
+                                <td style="padding: 6px 4px;">${typeText}</td>
+                                <td style="padding: 6px 4px;">${m.c_close.toFixed(2)}</td>
+                            </tr>
+                        `;
+                    });
                 }
-            });
-            
-            ['thick', 'outer', 'prices', 'dash', 'rr15'].forEach(key => {
-                document.getElementById('set-' + key).addEventListener('change', (e) => {
-                    posSettings[key] = e.target.checked;
-                    localStorage.setItem('posSettings', JSON.stringify(posSettings));
-                    drawPositionBoxes();
-                });
-            });
-            
-            function drawPositionBoxes() {
-                if (!showPositions || !manualMarkers.length) {
-                    tradeOverlay.innerHTML = '';
-                    return;
-                }
-                
-                let html = '';
-                
-                manualMarkers.forEach(m => {
-                    const x1 = chart.timeScale().timeToCoordinate(m.time);
-                    let x2 = chart.timeScale().timeToCoordinate(m.endTimeLocal);
-                    
-                    if (x1 === null) return;
-                    if (x2 === null) x2 = chart.timeScale().width();
-                    if (x2 <= x1) x2 = x1 + 20;
-                    
-                    const yEntry = candleSeries.priceToCoordinate(m.entry);
-                    const yTP = candleSeries.priceToCoordinate(m.tp);
-                    const ySL = candleSeries.priceToCoordinate(m.sl);
-                    
-                    if (yEntry === null || yTP === null || ySL === null) return;
-                    
-                    const w = x2 - x1;
-                    
-                    // TP box (green zone)
-                    const tpTop = Math.min(yEntry, yTP);
-                    const tpH = Math.abs(yEntry - yTP);
-                    
-                    const thickTp = posSettings.thick ? 'border-left:3px solid #26a69a;' : '';
-                    const borderTp = posSettings.outer ? 'border:1px solid rgba(38,166,154,0.5);' : '';
-                    
-                    html += `<div style="position:absolute;left:${x1}px;top:${tpTop}px;width:${w}px;height:${tpH}px;background:rgba(38,166,154,0.18);${borderTp}${thickTp}box-sizing:border-box;"></div>`;
-                    
-                    if (posSettings.prices) {
-                        html += `<div style="position:absolute;left:${x1+4}px;top:${Math.min(yEntry,yTP)+2}px;color:#26a69a;font-size:10px;font-weight:700;">TP ${m.tp.toFixed(2)}</div>`;
-                    }
-                    
-                    // SL box (red zone)
-                    const slTop = Math.min(yEntry, ySL);
-                    const slH = Math.abs(yEntry - ySL);
-                    
-                    const thickSl = posSettings.thick ? 'border-left:3px solid #ef5350;' : '';
-                    const borderSl = posSettings.outer ? 'border:1px solid rgba(239,83,80,0.5);' : '';
-                    
-                    html += `<div style="position:absolute;left:${x1}px;top:${slTop}px;width:${w}px;height:${slH}px;background:rgba(239,83,80,0.18);${borderSl}${thickSl}box-sizing:border-box;"></div>`;
-                    
-                    if (posSettings.prices) {
-                        html += `<div style="position:absolute;left:${x1+4}px;top:${Math.max(yEntry,ySL)-14}px;color:#ef5350;font-size:10px;font-weight:700;">SL ${m.sl.toFixed(2)}</div>`;
-                    }
-                    
-                    // Entry line
-                    if (posSettings.dash) {
-                        html += `<div style="position:absolute;left:${x1}px;top:${yEntry}px;width:${w}px;height:0;border-top:1px dashed #FFD700;"></div>`;
-                    }
-                    
-                    if (posSettings.prices) {
-                        html += `<div style="position:absolute;left:${x1+4}px;top:${yEntry-14}px;color:#FFD700;font-size:10px;font-weight:700;">${m.isBullish ? 'BUY' : 'SELL'} ${m.entry.toFixed(2)}</div>`;
-                    }
-                    
-                    // 1:1.5 R:R Line
-                    if (posSettings.rr15) {
-                        const rr15Price = m.isBullish ? m.entry + 1.5 * (m.entry - m.sl) : m.entry - 1.5 * (m.sl - m.entry);
-                        const yRR = candleSeries.priceToCoordinate(rr15Price);
-                        if (yRR !== null && yRR >= Math.min(yTP, ySL) && yRR <= Math.max(yTP, ySL)) {
-                            html += `<div style="position:absolute;left:${x1}px;top:${yRR}px;width:${w}px;height:0;border-top:1px dashed rgba(255,255,255,0.4);"></div>`;
-                            if (posSettings.prices) {
-                                html += `<div style="position:absolute;left:${x1+4}px;top:${yRR+2}px;color:rgba(255,255,255,0.6);font-size:10px;font-weight:700;">1.5 R:R (${rr15Price.toFixed(2)})</div>`;
-                            }
-                        }
-                    }
-                });
-                
-                tradeOverlay.innerHTML = html;
             }
-            
-            // Sync boxes with chart pan/zoom
-            chart.timeScale().subscribeVisibleTimeRangeChange(drawPositionBoxes);
-            chart.timeScale().subscribeVisibleLogicalRangeChange(drawPositionBoxes);
-            
-            let currentCrosshairTime = null;
-            chart.subscribeCrosshairMove((param) => {
-                if (param.time) {
-                    currentCrosshairTime = param.time;
-                }
-            });
-            
+
             function optimisticToggle(a, b, c) {
                 if (ws.readyState === WebSocket.OPEN) {
                     const existingIdx = manualSetups.findIndex(m => m.c_time === c.time);
@@ -350,20 +202,9 @@
                 }
             }
 
-            document.getElementById('mobile-mark-btn').addEventListener('click', () => {
-                if (currentCrosshairTime) {
-                    const dbTime = currentCrosshairTime - tzOffset;
-                    
-                    const cIdx = allCandles.findIndex(c => c.time === dbTime);
-                    if (cIdx >= 2) {
-                        optimisticToggle(allCandles[cIdx-2], allCandles[cIdx-1], allCandles[cIdx]);
-                    }
-                }
-            });
-            
             chart.subscribeClick((param) => {
                 if (!param.time) return;
-                const dbTime = param.time - tzOffset;
+                const dbTime = param.time + tzOffset;
                 
                 const cIdx = allCandles.findIndex(c => c.time === dbTime);
                 if (cIdx >= 2) {
@@ -371,7 +212,6 @@
                 }
             });
 
-            
             // 2. WebSocket Connection
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
@@ -380,8 +220,6 @@
             const wsText = document.getElementById('ws-text');
             const mt5Dot = document.getElementById('mt5-dot');
             const mt5Text = document.getElementById('mt5-text');
-            const signalContainer = document.getElementById('signal-container');
-            const historyList = document.getElementById('history-list');
 
             ws.onopen = () => {
                 wsDot.className = 'dot green';
@@ -392,7 +230,7 @@
                 wsDot.className = 'dot red';
                 wsText.innerText = 'Disconnected';
                 mt5Dot.className = 'dot red';
-                mt5Text.innerText = 'OANDA Offline';
+                mt5Text.innerText = 'MT5 Stream Offline';
             };
 
             ws.onerror = (err) => {
@@ -403,20 +241,18 @@
                 try {
                     const msg = JSON.parse(event.data);
 
-                    
-
                     if (msg.type === 'history') {
                         const localHistory = msg.data.map(d => ({...d, time: d.time - tzOffset}));
                         candleSeries.setData(localHistory);
-                        allCandles = localHistory;
+                        allCandles = msg.data.map(d => ({...d}));
                         
                         const smaData = [];
-                        for (let i = 199; i < allCandles.length; i++) {
+                        for (let i = 199; i < localHistory.length; i++) {
                             let sum = 0;
                             for (let j = 0; j < 200; j++) {
-                                sum += allCandles[i - j].close;
+                                sum += localHistory[i - j].close;
                             }
-                            smaData.push({ time: allCandles[i].time, value: sum / 200 });
+                            smaData.push({ time: localHistory[i].time, value: sum / 200 });
                         }
                         smaSeries.setData(smaData);
                         
@@ -428,22 +264,19 @@
                         volumeSeries.setData(volumeData);
                         
                         mt5Dot.className = 'dot green';
-                        mt5Text.innerText = 'OANDA Active';
-                    } 
-                    
-                    else if (msg.type === 'manual_update') {
-                        manualSetups = msg.data;
-                        updateManualMarkers();
-                    }
-                    else if (msg.type === 'candle') {
-                        msg.data.time -= tzOffset;
-                        candleSeries.update(msg.data);
-                        updateManualMarkers();
+                        mt5Text.innerText = 'IC Market Active';
                         
-                        if (allCandles.length > 0 && allCandles[allCandles.length - 1].time === msg.data.time) {
-                            allCandles[allCandles.length - 1] = msg.data;
+                        updateManualMarkers();
+                    } 
+                    else if (msg.type === 'candle') {
+                        const localCandle = {...msg.data, time: msg.data.time - tzOffset};
+                        candleSeries.update(localCandle);
+                        
+                        const existingIdx = allCandles.findIndex(c => c.time === msg.data.time);
+                        if (existingIdx !== -1) {
+                            allCandles[existingIdx] = {...msg.data};
                         } else {
-                            allCandles.push(msg.data);
+                            allCandles.push({...msg.data});
                         }
                         
                         if (allCandles.length >= 200) {
@@ -451,14 +284,20 @@
                             for (let j = 0; j < 200; j++) {
                                 sum += allCandles[allCandles.length - 1 - j].close;
                             }
-                            smaSeries.update({ time: msg.data.time, value: sum / 200 });
+                            smaSeries.update({ time: localCandle.time, value: sum / 200 });
                         }
 
                         volumeSeries.update({
-                            time: msg.data.time,
+                            time: localCandle.time,
                             value: msg.data.volume,
                             color: msg.data.close >= msg.data.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)'
                         });
+                        
+                        updateManualMarkers();
+                    }
+                    else if (msg.type === 'manual_update') {
+                        manualSetups = msg.data;
+                        updateManualMarkers();
                     }
                     else if (msg.type === 'history_signals') {
                         const signals = msg.data;
@@ -473,8 +312,9 @@
                             let markerColor = isBuy ? '#26a69a' : '#ef5350';
                             
                             if (isWon) {
-                                markerColor = '#FFD700'; // Gold
-                                markerShape = 'circle';
+                                markerColor = '#4CAF50';
+                            } else if (isLost) {
+                                markerColor = '#FF5722';
                             }
                             
                             markers.push({
@@ -482,109 +322,23 @@
                                 position: isBuy ? 'belowBar' : 'aboveBar',
                                 color: markerColor,
                                 shape: markerShape,
-                                text: isWon ? `${isBuy ? 'BUY' : 'SELL'} ${signal.confidence.toFixed(0)}% AI` : `${signal.confidence.toFixed(0)}% AI`
+                                text: `${signal.direction} ${(signal.confidence * 100).toFixed(0)}%${isWon ? ' ✅' : isLost ? ' ❌' : ''}`,
                             });
-                            
-                            // Only append the last 50 to the session history UI so it doesn't lag
-                            if (signals.indexOf(signal) > signals.length - 50) {
-                                const date = new Date((signal.time + tzOffset) * 1000);
-                                const timeStr = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                                const confStr = signal.confidence.toFixed(1);
-                                
-                                let statusHtml = '';
-                                if (isWon) statusHtml = `<span style="color: #FFD700; margin-left: 5px;">ðŸ† WON</span>`;
-                                else if (isLost) statusHtml = `<span style="color: #ef5350; margin-left: 5px;">âŒ LOST</span>`;
-                                
-                                const entry = document.createElement('div');
-                                entry.className = 'history-entry';
-                                entry.innerHTML = `
-                                    <span style="color: ${isBuy ? '#26a69a' : '#ef5350'}; font-weight: bold;">
-                                        ${signal.direction}
-                                    </span>
-                                    <span> - ${confStr}% @ ${timeStr}</span>
-                                    ${statusHtml}
-                                `;
-                                historyList.prepend(entry);
-                            }
                         }
-                        // Sort markers by time before setting
                         markers.sort((a, b) => a.time - b.time);
-                        candleSeries.setMarkers(markers);
-                    }
-                    else if (msg.type === 'signal') {
-                        const signal = msg.data;
-                        const isBuy = signal.direction === 'BUY';
-                        const isHighConf = signal.confidence >= 50;
-                        
-                        signal.time -= tzOffset;
-                        
-                        markers.push({
-                            time: signal.time,
-                            position: isBuy ? 'belowBar' : 'aboveBar',
-                            color: isBuy ? '#26a69a' : '#ef5350',
-                            shape: isBuy ? 'arrowUp' : 'arrowDown',
-                            text: `${signal.confidence.toFixed(0)}% AI`
-                        });
-                        // Sort markers by time to prevent lightweight-charts errors
-                        markers.sort((a, b) => a.time - b.time);
-                        candleSeries.setMarkers(markers);
-
-                        if (isHighConf) {
-                            signalContainer.className = `signal-active ${isBuy ? 'buy' : 'sell'}`;
-                            signalContainer.innerHTML = `
-                                <div class="dir">${signal.direction}</div>
-                                <div class="conf">${signal.confidence.toFixed(1)}% Confidence</div>
-                            `;
-
-                            const li = document.createElement('div');
-                            li.className = 'history-entry';
-                            li.dataset.time = signal.time;
-                            const dateObj = new Date((signal.time + tzOffset) * 1000);
-                            const timeStr = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                            li.innerHTML = `<span style="color: ${isBuy ? '#26a69a' : '#ef5350'}; font-weight: bold;">${signal.direction}</span> - ${signal.confidence.toFixed(1)}% @ ${timeStr}`;
-                            historyList.prepend(li);
-                        }
-                    }
-                    else if (msg.type === 'trade_resolved') {
-                        const data = msg.data;
-                        const targetTime = data.time - tzOffset;
-                        
-                        const markerIndex = markers.findIndex(m => m.time === targetTime);
-                        if (markerIndex !== -1 && data.won) {
-                            markers[markerIndex].color = '#FFD700';
-                            markers[markerIndex].shape = 'circle';
-                            
-                            // Add BUY/SELL prefix if it's not already there
-                            let currentText = markers[markerIndex].text;
-                            if (!currentText.startsWith('BUY') && !currentText.startsWith('SELL')) {
-                                const isBuy = markers[markerIndex].position === 'belowBar';
-                                markers[markerIndex].text = `${isBuy ? 'BUY' : 'SELL'} ${currentText}`;
-                            }
-                            
-                            // Re-apply markers
-                            candleSeries.setMarkers(markers);
-                        }
-                        
-                        // Update the sidebar history dynamically
-                        const entries = document.getElementsByClassName('history-entry');
-                        for (let entry of entries) {
-                            if (entry.dataset.time == targetTime) {
-                                if (data.won) {
-                                    entry.innerHTML += `<span style="color: #FFD700; margin-left: 5px;">ðŸ† WON</span>`;
-                                } else {
-                                    entry.innerHTML += `<span style="color: #ef5350; margin-left: 5px;">âŒ LOST</span>`;
-                                }
-                                break;
-                            }
-                        }
                     }
                 } catch(e) {
                     console.error("Message processing error:", e);
                 }
             };
+
         } catch(e) {
-            document.getElementById('ws-text').innerText = "JS Error";
-            document.getElementById('mt5-text').innerText = e.message;
+            // Display error in the status panel
+            const wsText = document.getElementById('ws-text');
+            const mt5Text = document.getElementById('mt5-text');
+            if (wsText) { wsText.innerText = 'JS Error'; document.getElementById('ws-dot').className = 'dot red'; }
+            if (mt5Text) { mt5Text.innerText = e.message; document.getElementById('mt5-dot').className = 'dot red'; }
+            console.error("FATAL:", e);
         }
     </script>
 </body>
