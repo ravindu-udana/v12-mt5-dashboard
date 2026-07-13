@@ -129,7 +129,7 @@ async def live_trading_loop():
         except Exception as e:
             print(f"Loop Error: {e}")
             
-        await asyncio.sleep(1) # Poll every 1 second
+        await asyncio.sleep(0.5) # Poll every 0.5 second
 
 @app.on_event("startup")
 async def startup_event():

@@ -66,7 +66,7 @@ def main():
             continue
             
         fetch_mt5()
-        time.sleep(5)
+        time.sleep(0.5)
 
 if __name__ == "__main__":
     main()
