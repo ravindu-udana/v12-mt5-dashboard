@@ -61,7 +61,7 @@
                         <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-sma-label" checked> 200 SMA label</label>
                     </div>
                     <div id="candle-countdown" class="countdown">00:00</div>
-                    <div class="live-pulse">LIVE</div>
+                    <div id="live-badge" class="live-pulse">LIVE</div>
                 </div>
             </header>
             <div id="tvchart"></div>
@@ -77,6 +77,41 @@
                 const secondsLeft = 60 - now.getSeconds();
                 const displaySecs = secondsLeft === 60 ? 0 : secondsLeft;
                 countdownEl.innerText = `00:${displaySecs.toString().padStart(2, '0')}`;
+            }, 1000);
+            
+            // Live Badge Logic
+            let lastMarketTime = Date.now();
+            const liveBadge = document.getElementById('live-badge');
+            
+            function isMarketClosed() {
+                const now = new Date();
+                const day = now.getUTCDay();
+                const hour = now.getUTCHours();
+                // Weekend
+                if (day === 5 && hour >= 21) return true;
+                if (day === 6) return true;
+                if (day === 0 && hour < 21) return true;
+                // Daily break
+                if (hour === 21) return true; // 5 PM - 6 PM EST
+                return false;
+            }
+
+            setInterval(() => {
+                if (typeof ws === 'undefined' || ws.readyState !== WebSocket.OPEN) {
+                    liveBadge.className = 'live-pulse offline';
+                    liveBadge.innerText = 'OFFLINE';
+                } else if (Date.now() - lastMarketTime > 60000) {
+                    if (isMarketClosed()) {
+                        liveBadge.className = 'live-pulse closed';
+                        liveBadge.innerText = 'CLOSED';
+                    } else {
+                        liveBadge.className = 'live-pulse delayed';
+                        liveBadge.innerText = 'DELAYED';
+                    }
+                } else {
+                    liveBadge.className = 'live-pulse';
+                    liveBadge.innerText = 'LIVE';
+                }
             }, 1000);
 
             // 1. Initialize Chart
@@ -407,6 +442,9 @@
                     const msg = JSON.parse(event.data);
 
                     if (msg.type === 'history') {
+                        if (msg.data && msg.data.length > 0) {
+                            lastMarketTime = msg.data[msg.data.length - 1].time * 1000;
+                        }
                         const localHistory = msg.data.map(d => ({...d, time: d.time - tzOffset}));
                         candleSeries.setData(localHistory);
                         allCandles = msg.data.map(d => ({...d}));
@@ -434,6 +472,7 @@
                         updateManualMarkers();
                     } 
                     else if (msg.type === 'candle') {
+                        lastMarketTime = msg.data.time * 1000;
                         const localCandle = {...msg.data, time: msg.data.time - tzOffset};
                         candleSeries.update(localCandle);
                         

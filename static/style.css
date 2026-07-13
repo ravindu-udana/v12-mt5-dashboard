@@ -220,6 +220,25 @@ h3 {
     padding: 4px 10px;
     border-radius: 4px;
     animation: blink 1s infinite;
+    transition: all 0.3s;
+}
+
+.live-pulse.delayed {
+    color: #FF9800;
+    background: rgba(255, 152, 0, 0.1);
+    animation: none;
+}
+
+.live-pulse.offline {
+    color: #9E9E9E;
+    background: rgba(158, 158, 158, 0.1);
+    animation: none;
+}
+
+.live-pulse.closed {
+    color: #9C27B0;
+    background: rgba(156, 39, 176, 0.1);
+    animation: none;
 }
 
 @keyframes blink {
