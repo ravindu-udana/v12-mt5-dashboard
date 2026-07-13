@@ -48,12 +48,17 @@
                 <div class="header-right">
                     <button id="toggle-positions-btn" style="background:rgba(38,166,154,0.2);border:1px solid rgba(38,166,154,0.3);color:var(--text-secondary,#888);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;font-family:Inter;">Positions</button>
                     <button id="pos-settings-btn" style="background:rgba(38,166,154,0.2);border:1px solid rgba(38,166,154,0.3);color:var(--text-secondary,#888);padding:4px 6px;border-radius:4px;cursor:pointer;font-size:11px;">&#9881;</button>
-                    <div id="pos-settings-menu" style="display:none;position:absolute;right:10px;top:40px;background:#1a1d26;border:1px solid rgba(42,46,57,0.8);border-radius:6px;padding:8px 12px;z-index:100;font-size:12px;color:#c8c8c8;">
+                    <div id="pos-settings-menu" style="display:none;position:absolute;right:10px;top:40px;background:#1a1d26;border:1px solid rgba(42,46,57,0.8);border-radius:6px;padding:8px 12px;z-index:100;font-size:12px;color:#c8c8c8;min-width:140px;">
+                        <div style="font-weight:bold;color:#26a69a;margin-bottom:6px;border-bottom:1px solid rgba(38,166,154,0.3);padding-bottom:2px;">Positions</div>
                         <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-thick" checked> Thick border</label>
                         <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-outer" checked> Outer border</label>
                         <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-prices" checked> Show prices</label>
                         <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-dash" checked> Entry dash</label>
                         <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-rr15"> 1.5 R:R line</label>
+                        
+                        <div style="font-weight:bold;color:#FFC107;margin-top:10px;margin-bottom:6px;border-bottom:1px solid rgba(255,193,7,0.3);padding-bottom:2px;">Indicators</div>
+                        <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-sma-line" checked> 200 SMA line</label>
+                        <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-sma-label" checked> 200 SMA label</label>
                     </div>
                     <div id="candle-countdown" class="countdown">00:00</div>
                     <div class="live-pulse">LIVE</div>
@@ -224,12 +229,22 @@
             
             const savedSettings = localStorage.getItem('posSettings');
             let posSettings = savedSettings ? JSON.parse(savedSettings) : {
-                thick: true, outer: true, prices: true, dash: true, rr15: false
+                thick: true, outer: true, prices: true, dash: true, rr15: false, smaLine: true, smaLabel: true
             };
             
-            ['thick', 'outer', 'prices', 'dash', 'rr15'].forEach(key => {
+            if (posSettings.smaLine === undefined) posSettings.smaLine = true;
+            if (posSettings.smaLabel === undefined) posSettings.smaLabel = posSettings.sma ?? true;
+            
+            ['thick', 'outer', 'prices', 'dash', 'rr15', 'sma-line', 'sma-label'].forEach(key => {
+                const camelKey = key.replace(/-([a-z])/g, g => g[1].toUpperCase());
                 const cb = document.getElementById('set-' + key);
-                if (cb) cb.checked = posSettings[key];
+                if (cb) cb.checked = posSettings[camelKey];
+            });
+            
+            smaSeries.applyOptions({ 
+                visible: posSettings.smaLine,
+                lastValueVisible: posSettings.smaLabel,
+                title: posSettings.smaLabel ? '200 SMA' : ''
             });
             
             const posBtn = document.getElementById('toggle-positions-btn');
@@ -259,11 +274,21 @@
                 }
             });
             
-            ['thick', 'outer', 'prices', 'dash', 'rr15'].forEach(key => {
+            ['thick', 'outer', 'prices', 'dash', 'rr15', 'sma-line', 'sma-label'].forEach(key => {
                 document.getElementById('set-' + key).addEventListener('change', (e) => {
-                    posSettings[key] = e.target.checked;
+                    const camelKey = key.replace(/-([a-z])/g, g => g[1].toUpperCase());
+                    posSettings[camelKey] = e.target.checked;
                     localStorage.setItem('posSettings', JSON.stringify(posSettings));
-                    drawPositionBoxes();
+                    
+                    if (key === 'sma-line' || key === 'sma-label') {
+                        smaSeries.applyOptions({ 
+                            visible: posSettings.smaLine,
+                            lastValueVisible: posSettings.smaLabel,
+                            title: posSettings.smaLabel ? '200 SMA' : ''
+                        });
+                    } else {
+                        drawPositionBoxes();
+                    }
                 });
             });
             
