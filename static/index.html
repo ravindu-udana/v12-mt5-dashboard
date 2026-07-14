@@ -235,7 +235,7 @@
                         const typeText = isBullish ? '<span style="color:#26a69a; font-weight:bold;">BULL</span>' : '<span style="color:#ef5350; font-weight:bold;">BEAR</span>';
                         const dateStr = new Date(m.c_time * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                         tbody.innerHTML += `
-                            <tr style="border-bottom: 1px solid rgba(42, 46, 57, 0.5);">
+                            <tr style="border-bottom: 1px solid rgba(42, 46, 57, 0.5); cursor: pointer;" onclick="scrollToTime(${m.c_time})" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
                                 <td style="padding: 6px 4px;">${dateStr}</td>
                                 <td style="padding: 6px 4px;">${typeText}</td>
                                 <td style="padding: 6px 4px;">${m.c_close.toFixed(2)}</td>
@@ -244,6 +244,18 @@
                     });
                 }
             }
+            
+            window.scrollToTime = function(dbTime) {
+                const cIdx = allCandles.findIndex(c => c.time === dbTime);
+                if (cIdx !== -1) {
+                    const currentRange = chart.timeScale().getVisibleLogicalRange();
+                    const numBars = currentRange ? (currentRange.to - currentRange.from) : 100;
+                    chart.timeScale().setVisibleLogicalRange({
+                        from: cIdx - Math.floor(numBars/2),
+                        to: cIdx + Math.ceil(numBars/2)
+                    });
+                }
+            };
 
             function optimisticToggle(a, b, c) {
                 if (ws.readyState === WebSocket.OPEN) {
