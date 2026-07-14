@@ -70,18 +70,25 @@
 
     <script>
         try {
-            // 0. Countdown Timer
-            const countdownEl = document.getElementById('candle-countdown');
-            setInterval(() => {
-                const now = new Date();
-                const secondsLeft = 60 - now.getSeconds();
-                const displaySecs = secondsLeft === 60 ? 0 : secondsLeft;
-                countdownEl.innerText = `00:${displaySecs.toString().padStart(2, '0')}`;
-            }, 1000);
-            
-            // Live Badge Logic
+            // Live Badge & Timer Logic
             let lastMarketTime = Date.now();
+            const countdownEl = document.getElementById('candle-countdown');
             const liveBadge = document.getElementById('live-badge');
+            
+            // 0. Countdown Timer
+            setInterval(() => {
+                const now = Date.now();
+                // Since we are on a 1m chart, the candle closes 60s after its open time
+                const candleCloseTime = lastMarketTime + 60000;
+                let timeLeft = candleCloseTime - now;
+                
+                if (timeLeft < 0 || isMarketClosed()) {
+                    countdownEl.innerText = `00:00`;
+                } else {
+                    const secondsLeft = Math.ceil(timeLeft / 1000);
+                    countdownEl.innerText = `00:${secondsLeft.toString().padStart(2, '0')}`;
+                }
+            }, 1000);
             
             function isMarketClosed() {
                 const now = new Date();
