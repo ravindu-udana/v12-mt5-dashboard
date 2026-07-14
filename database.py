@@ -55,16 +55,16 @@ def save_candles(df):
     # Convert dataframe to list of tuples for fast insert
     # df must contain: time, open, high, low, close, tick_volume
     records = []
-    for _, row in df.iterrows():
+    for r in df.itertuples():
         # Handle time
-        timestamp = int(row['datetime'].timestamp())
+        timestamp = int(r.datetime.timestamp())
         records.append((
             timestamp,
-            float(row['open']),
-            float(row['high']),
-            float(row['low']),
-            float(row['close']),
-            float(row['tick_volume'])
+            float(r.open),
+            float(r.high),
+            float(r.low),
+            float(r.close),
+            float(r.tick_volume)
         ))
         
     cursor = conn.cursor()

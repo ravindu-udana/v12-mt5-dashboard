@@ -131,7 +131,8 @@ async def live_trading_loop():
         try:
             df = get_latest_mt5_data()
             if df is not None:
-                database.save_candles(df)
+                # OPTIMIZATION: Only save the last 100 candles to DB to prevent 6-8s IO lag
+                database.save_candles(df.tail(100))
                 
                 active_candle = df.iloc[-1]
                 await broadcast({
