@@ -52,6 +52,8 @@
                     <h2>XAUUSD (Gold) <span class="timeframe">1m</span></h2>
                 </div>
                 <div class="header-right">
+                    <button id="zoom-out-btn" style="background:rgba(38,166,154,0.1);border:1px solid rgba(38,166,154,0.2);color:var(--text-secondary,#888);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:14px;margin-right:2px;" title="Zoom Out">➖</button>
+                    <button id="zoom-in-btn" style="background:rgba(38,166,154,0.1);border:1px solid rgba(38,166,154,0.2);color:var(--text-secondary,#888);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:14px;margin-right:4px;" title="Zoom In">➕</button>
                     <button id="fullscreen-btn" style="background:none;border:none;color:var(--text-secondary,#888);cursor:pointer;font-size:16px;padding:4px;" title="Toggle Fullscreen">⛶</button>
                     <button id="toggle-positions-btn" style="background:rgba(38,166,154,0.2);border:1px solid rgba(38,166,154,0.3);color:var(--text-secondary,#888);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;font-family:Inter;">Positions</button>
                     <button id="pos-settings-btn" style="background:rgba(38,166,154,0.2);border:1px solid rgba(38,166,154,0.3);color:var(--text-secondary,#888);padding:4px 6px;border-radius:4px;cursor:pointer;font-size:11px;">&#9881;</button>
@@ -151,6 +153,23 @@
                 upColor: '#26a69a', downColor: '#ef5350', borderDownColor: '#ef5350', borderUpColor: '#26a69a',
                 wickDownColor: '#ef5350', wickUpColor: '#26a69a',
             });
+            
+            const smaSeries = chart.addLineSeries({ color: '#ffc107', lineWidth: 2, title: '200 SMA', crosshairMarkerVisible: false });
+            
+            function applyZoom(direction) {
+                const range = chart.timeScale().getVisibleLogicalRange();
+                if (!range) return;
+                const center = (range.from + range.to) / 2;
+                const currentBars = range.to - range.from;
+                const newBars = direction > 0 ? currentBars * 0.75 : currentBars * 1.33;
+                chart.timeScale().setVisibleLogicalRange({
+                    from: center - newBars / 2,
+                    to: center + newBars / 2
+                });
+            }
+            
+            document.getElementById('zoom-in-btn').addEventListener('click', () => applyZoom(1));
+            document.getElementById('zoom-out-btn').addEventListener('click', () => applyZoom(-1));
             
             let crosshairActive = false;
             let currentCrosshairTime = null;
