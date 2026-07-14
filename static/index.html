@@ -160,9 +160,10 @@
             }
             
             chart.subscribeCrosshairMove((param) => {
-                if (param.time && param.seriesData.get(candleSeries)) {
+                const data = (param.seriesData && param.seriesData.get(candleSeries)) || (param.seriesPrices && param.seriesPrices.get(candleSeries));
+                if (param.time && data) {
                     crosshairActive = true;
-                    updateLegend(param.seriesData.get(candleSeries));
+                    updateLegend(data);
                 } else {
                     crosshairActive = false;
                     if (allCandles && allCandles.length > 0) {
