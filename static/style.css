@@ -117,6 +117,86 @@ h3 {
     animation: pulse 2s infinite;
 }
 
+.tp-label {
+    position: absolute;
+    color: #26a69a;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.sl-label {
+    position: absolute;
+    color: #ef5350;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+/* Mobile Responsiveness */
+.mobile-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 24px;
+    cursor: pointer;
+    margin-right: 15px;
+}
+.mobile-mark-btn {
+    display: none;
+}
+.close-sidebar {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 24px;
+    cursor: pointer;
+    margin-left: auto;
+}
+
+@media (max-width: 1024px) {
+    .mobile-toggle, .close-sidebar {
+        display: block;
+    }
+    .mobile-mark-btn {
+        display: flex;
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        width: 56px;
+        height: 56px;
+        border-radius: 28px;
+        background: var(--accent);
+        color: white;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        z-index: 100;
+        border: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        cursor: pointer;
+    }
+    .ai-panel {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        box-shadow: 4px 0 15px rgba(0,0,0,0.5);
+    }
+    .ai-panel.open {
+        transform: translateX(0);
+    }
+    .timeframe { display: none; }
+    .countdown { font-size: 12px; padding: 4px 5px; }
+    .live-pulse { font-size: 11px; padding: 4px 5px; }
+}
+
+@media (max-width: 480px) {
+    .chart-header h2 { font-size: 14px; }
+}
+
 .signal-active .dir {
     font-size: 28px;
     font-weight: 800;
