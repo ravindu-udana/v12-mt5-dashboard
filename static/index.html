@@ -223,12 +223,14 @@
                 }
             }
 
+            let lastTableHTML = '';
             function updateManualTable(data) {
                 const tbody = document.querySelector('#manual-table tbody');
+                let newHtml = '';
+                
                 if (!data || data.length === 0) {
-                    tbody.innerHTML = '<tr class="empty-row"><td colspan="3" style="text-align:center; padding:10px; color:rgba(255,255,255,0.3);">Click candle to mark</td></tr>';
+                    newHtml = '<tr class="empty-row"><td colspan="3" style="text-align:center; padding:10px; color:rgba(255,255,255,0.3);">Click candle to mark</td></tr>';
                 } else {
-                    tbody.innerHTML = '';
                     const sorted = [...data].sort((a,b) => b.c_time - a.c_time);
                     sorted.forEach(m => {
                         const isBullish = m.c_close > m.c_open;
@@ -236,7 +238,7 @@
                         const d = new Date(m.c_time * 1000);
                         const dateStr = d.toLocaleDateString([], {month: 'short', day: 'numeric'});
                         const timeStr = d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                        tbody.innerHTML += `
+                        newHtml += `
                             <tr style="border-bottom: 1px solid rgba(42, 46, 57, 0.5); cursor: pointer;" onclick="scrollToTime(${m.c_time})" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
                                 <td style="padding: 6px 4px;">${dateStr}</td>
                                 <td style="padding: 6px 4px;">${timeStr}</td>
@@ -244,6 +246,11 @@
                             </tr>
                         `;
                     });
+                }
+                
+                if (newHtml !== lastTableHTML) {
+                    tbody.innerHTML = newHtml;
+                    lastTableHTML = newHtml;
                 }
             }
             
