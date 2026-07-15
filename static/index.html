@@ -42,6 +42,62 @@
                     <tbody><tr class="empty-row"><td colspan="3" style="text-align:center; padding:10px; color:rgba(255,255,255,0.3);">Click candle to mark</td></tr></tbody>
                 </table>
             </div>
+            
+            <!-- Trading Panel -->
+            <div class="status-card" style="margin-top:12px;" id="trading-panel">
+                <h3>Live Trading</h3>
+                <div class="setting-row">
+                    <label>Lot Size</label>
+                    <input type="number" id="trade-lot" value="0.01" min="0.01" step="0.01" style="width: 60px; background: #131722; border: 1px solid #2a2e39; color: white; padding: 2px 4px; border-radius: 4px;">
+                </div>
+                <div class="setting-row" title="If enabled, trade executes exactly at 00:00 of current candle">
+                    <label>Execute at Candle Close</label>
+                    <label class="switch">
+                        <input type="checkbox" id="trade-candle-close">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-row">
+                    <label>Use Default SL/TP</label>
+                    <label class="switch">
+                        <input type="checkbox" id="trade-use-defaults" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-row">
+                    <label>SL/TP Unit</label>
+                    <select id="trade-sltp-unit" style="background: #131722; border: 1px solid #2a2e39; color: white; padding: 2px 4px; border-radius: 4px;">
+                        <option value="pips">Pips</option>
+                        <option value="usd">$ Value</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <label>Default SL</label>
+                    <input type="number" id="trade-sl" value="20" min="0" step="1" style="width: 60px; background: #131722; border: 1px solid #2a2e39; color: white; padding: 2px 4px; border-radius: 4px;">
+                </div>
+                <div class="setting-row">
+                    <label>Default TP</label>
+                    <input type="number" id="trade-tp" value="40" min="0" step="1" style="width: 60px; background: #131722; border: 1px solid #2a2e39; color: white; padding: 2px 4px; border-radius: 4px;">
+                </div>
+                
+                <div style="display:flex; gap:10px; margin-top:15px;">
+                    <button id="btn-buy" style="flex:1; background:#26a69a; color:white; border:none; padding:10px; border-radius:4px; font-weight:bold; cursor:pointer;">BUY</button>
+                    <button id="btn-sell" style="flex:1; background:#ef5350; color:white; border:none; padding:10px; border-radius:4px; font-weight:bold; cursor:pointer;">SELL</button>
+                </div>
+                
+                <hr style="border-color: rgba(255,255,255,0.1); margin: 15px 0;">
+                
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h4 style="margin:0; font-size:13px; font-weight:600; color:var(--text-primary);">Live Trades</h4>
+                    <label class="switch" title="Show positions on chart">
+                        <input type="checkbox" id="show-chart-positions" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="live-trades-list" style="margin-top:10px; font-size:12px; color:#c8c8c8;">
+                    <div style="text-align:center; padding:10px; color:rgba(255,255,255,0.3);">No active trades</div>
+                </div>
+            </div>
         </aside>
 
         <!-- Main Chart Area -->
@@ -313,6 +369,9 @@
 
             let markers = [];
             let allCandles = [];
+            let liveTrades = [];
+            let pendingTradeExecution = null;
+
             let manualSetups = [];
             let manualMarkers = [];
             const tzOffset = new Date().getTimezoneOffset() * 60;
@@ -601,13 +660,14 @@
             });
             
             function drawPositionBoxes() {
-                if (!showPositions || !manualMarkers.length) {
+                if (!showPositions) {
                     tradeOverlay.innerHTML = '';
                     return;
                 }
                 
                 let html = '';
                 
+                // Draw manual markers
                 manualMarkers.forEach(m => {
                     const x1 = chart.timeScale().timeToCoordinate(m.time);
                     let x2 = chart.timeScale().timeToCoordinate(m.endTimeLocal);
@@ -668,9 +728,157 @@
                     }
                 });
                 
+                // Draw Live Trades
+                const showChartPos = document.getElementById('show-chart-positions').checked;
+                if (showChartPos && liveTrades && liveTrades.length > 0) {
+                    liveTrades.forEach(pos => {
+                        // MT5 time is Unix seconds, convert to Unix milliseconds if needed. But MT5 time might be in GMT+3.
+                        // Assuming the bridge returns raw MT5 pos.time which is seconds since epoch in broker time.
+                        // For simplicity, we just use the current right edge for active trades.
+                        const x1 = chart.timeScale().width() - 150; 
+                        let x2 = chart.timeScale().width();
+                        
+                        const yEntry = candleSeries.priceToCoordinate(pos.price_open);
+                        let yTP = pos.tp > 0 ? candleSeries.priceToCoordinate(pos.tp) : null;
+                        let ySL = pos.sl > 0 ? candleSeries.priceToCoordinate(pos.sl) : null;
+                        
+                        if (yEntry === null) return;
+                        
+                        const w = x2 - x1;
+                        
+                        // Entry line
+                        html += `<div style="position:absolute;left:${x1}px;top:${yEntry}px;width:${w}px;height:0;border-top:2px solid ${pos.type===0 ? '#26a69a' : '#ef5350'};"></div>`;
+                        html += `<div style="position:absolute;left:${x1+4}px;top:${yEntry-16}px;color:${pos.type===0 ? '#26a69a' : '#ef5350'};font-size:11px;font-weight:700; background:rgba(19,23,34,0.7); padding:2px 4px; border-radius:2px;">ENTRY ${pos.price_open.toFixed(2)}</div>`;
+                        
+                        if (yTP !== null) {
+                            const tpTop = Math.min(yEntry, yTP);
+                            const tpH = Math.abs(yEntry - yTP);
+                            html += `<div style="position:absolute;left:${x1}px;top:${tpTop}px;width:${w}px;height:${tpH}px;background:rgba(38,166,154,0.1);border:1px solid rgba(38,166,154,0.3);box-sizing:border-box;"></div>`;
+                            html += `<div style="position:absolute;left:${x1+4}px;top:${yTP > yEntry ? yTP+2 : yTP-16}px;color:#26a69a;font-size:11px;font-weight:700; background:rgba(19,23,34,0.7); padding:2px 4px; border-radius:2px;">TP ${pos.tp.toFixed(2)}</div>`;
+                        }
+                        
+                        if (ySL !== null) {
+                            const slTop = Math.min(yEntry, ySL);
+                            const slH = Math.abs(yEntry - ySL);
+                            html += `<div style="position:absolute;left:${x1}px;top:${slTop}px;width:${w}px;height:${slH}px;background:rgba(239,83,80,0.1);border:1px solid rgba(239,83,80,0.3);box-sizing:border-box;"></div>`;
+                            html += `<div style="position:absolute;left:${x1+4}px;top:${ySL > yEntry ? ySL+2 : ySL-16}px;color:#ef5350;font-size:11px;font-weight:700; background:rgba(19,23,34,0.7); padding:2px 4px; border-radius:2px;">SL ${pos.sl.toFixed(2)}</div>`;
+                        }
+                    });
+                }
+                
                 tradeOverlay.innerHTML = html;
             }
             
+
+            // ---- LIVE TRADING LOGIC ----
+            function executeTradeNow(params) {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'execute_trade', data: params }));
+                }
+            }
+            
+            function onTradeButtonClicked(action) {
+                const lot = parseFloat(document.getElementById('trade-lot').value);
+                const isCandleClose = document.getElementById('trade-candle-close').checked;
+                const useDefaults = document.getElementById('trade-use-defaults').checked;
+                const slVal = parseFloat(document.getElementById('trade-sl').value);
+                const tpVal = parseFloat(document.getElementById('trade-tp').value);
+                const unit = document.getElementById('trade-sltp-unit').value;
+                
+                let currentPrice = null;
+                if (allCandles.length > 0) {
+                    currentPrice = allCandles[allCandles.length-1].close;
+                }
+                
+                let sl = 0;
+                let tp = 0;
+                
+                if (useDefaults && currentPrice) {
+                    if (unit === 'pips') {
+                        // 1 pip = 0.1 for XAUUSD (since usually 1 pip is 10 points) but actually for gold 1 pip = $0.1 or $1?
+                        // Usually 1 pip in Gold is 0.1. So 20 pips = 2.0
+                        const pipValue = 0.1;
+                        if (action === 'buy') {
+                            sl = currentPrice - (slVal * pipValue);
+                            tp = currentPrice + (tpVal * pipValue);
+                        } else {
+                            sl = currentPrice + (slVal * pipValue);
+                            tp = currentPrice - (tpVal * pipValue);
+                        }
+                    } else if (unit === 'usd') {
+                        // $ value. 1 lot = 100 oz. So 1 unit of price = $100 per lot.
+                        // Let's assume standard calculation: price_change = (usd_value / (lot * 100))
+                        const priceChangeSl = slVal / (lot * 100);
+                        const priceChangeTp = tpVal / (lot * 100);
+                        if (action === 'buy') {
+                            sl = currentPrice - priceChangeSl;
+                            tp = currentPrice + priceChangeTp;
+                        } else {
+                            sl = currentPrice + priceChangeSl;
+                            tp = currentPrice - priceChangeTp;
+                        }
+                    }
+                }
+                
+                const tradeParams = { action, volume: lot, sl, tp };
+                
+                if (isCandleClose) {
+                    pendingTradeExecution = tradeParams;
+                    alert("Trade queued. Will execute at exactly 00:00 of current candle close.");
+                } else {
+                    executeTradeNow(tradeParams);
+                }
+            }
+            
+            document.getElementById('btn-buy').addEventListener('click', () => onTradeButtonClicked('buy'));
+            document.getElementById('btn-sell').addEventListener('click', () => onTradeButtonClicked('sell'));
+            
+            document.getElementById('show-chart-positions').addEventListener('change', drawPositionBoxes);
+            
+            function closeLiveTrade(ticket) {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'close_trade', data: { ticket } }));
+                }
+            }
+            
+            // Expose globally
+            window.closeLiveTrade = closeLiveTrade;
+            
+            function updateLiveTradesUI() {
+                const list = document.getElementById('live-trades-list');
+                if (!liveTrades || liveTrades.length === 0) {
+                    list.innerHTML = '<div style="text-align:center; padding:10px; color:rgba(255,255,255,0.3);">No active trades</div>';
+                    return;
+                }
+                
+                let html = '';
+                liveTrades.forEach(pos => {
+                    // Spread = 0.1 pip ($1 per lot), Commission = $3.50 per lot.
+                    // Let's assume MT5 raw profit is pos.profit.
+                    // The user wants to deduct $3.50 + $1 = $4.50 per lot manually if MT5 didn't. 
+                    // But user confirmed: "just use MT5's exact profit values which might already factor in your demo account's commissions then"
+                    // So we will just use pos.profit directly!
+                    const netPnl = pos.profit;
+                    const isProfit = netPnl >= 0;
+                    const color = isProfit ? '#26a69a' : '#ef5350';
+                    const typeStr = pos.type === 0 ? 'BUY' : 'SELL';
+                    
+                    html += `
+                        <div style="background:rgba(255,255,255,0.05); padding:8px; margin-bottom:8px; border-radius:4px; border-left:3px solid ${color};">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                <strong>${typeStr} ${pos.volume}</strong>
+                                <span style="color:${color}; font-weight:bold; font-size:14px;">$${netPnl.toFixed(2)}</span>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <span style="color:rgba(255,255,255,0.6);">Entry: ${pos.price_open.toFixed(2)}</span>
+                                <button onclick="closeLiveTrade(${pos.ticket})" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:white; border-radius:3px; padding:2px 6px; cursor:pointer; font-size:10px;">CLOSE</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                list.innerHTML = html;
+            }
+
             // Sync boxes with chart pan/zoom
             chart.timeScale().subscribeVisibleTimeRangeChange(drawPositionBoxes);
             chart.timeScale().subscribeVisibleLogicalRangeChange(drawPositionBoxes);
@@ -808,6 +1016,23 @@
                         
                         recalculateIndicators();
                         
+                        if (msg.positions !== undefined) {
+                            liveTrades = msg.positions;
+                            updateLiveTradesUI();
+                            drawPositionBoxes();
+                        }
+                        
+                        // Check if we need to execute a pending trade exactly on candle close
+                        if (msg.type === 'candle' && pendingTradeExecution) {
+                            const now = Date.now();
+                            const candleCloseTime = lastMarketTime + 60000;
+                            // If we are within 2 seconds of close, execute it!
+                            if (Math.abs(candleCloseTime - now) < 2000) {
+                                executeTradeNow(pendingTradeExecution);
+                                pendingTradeExecution = null; // Clear it
+                            }
+                        }
+
                         const volumeData = msg.data.map(d => ({
                             time: d.time - tzOffset,
                             value: d.volume,
@@ -864,6 +1089,24 @@
                                 const currentStdDev = baseStdDev + (k * stepStdDev);
                                 bbUpperSeriesList[k].update({ time: localCandle.time, value: sma + currentStdDev * stdDev });
                                 bbLowerSeriesList[k].update({ time: localCandle.time, value: sma - currentStdDev * stdDev });
+                            }
+                        }
+
+                        
+                        if (msg.positions !== undefined) {
+                            liveTrades = msg.positions;
+                            updateLiveTradesUI();
+                            drawPositionBoxes();
+                        }
+                        
+                        // Check if we need to execute a pending trade exactly on candle close
+                        if (pendingTradeExecution) {
+                            const now = Date.now();
+                            const candleCloseTime = lastMarketTime + 60000;
+                            // If we are within 2 seconds of close, execute it!
+                            if (Math.abs(candleCloseTime - now) < 2000 || isMarketClosed()) {
+                                executeTradeNow(pendingTradeExecution);
+                                pendingTradeExecution = null;
                             }
                         }
 
