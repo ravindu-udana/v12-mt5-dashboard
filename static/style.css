@@ -41,7 +41,7 @@ body {
     flex-direction: column;
     padding: 20px;
     gap: 24px;
-    z-index: 10;
+    z-index: 100;
     overflow-y: auto;
 }
 
@@ -535,6 +535,7 @@ input:checked + .slider:before { transform: translateX(14px); }
         bottom: 0;
         transition: left 0.3s ease;
         box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+        z-index: 1000;
     }
     .ai-panel.open {
         left: 0;
