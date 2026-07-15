@@ -201,7 +201,7 @@ h3 {
     .header-right {
         gap: 6px;
     }
-    #zoom-out-btn, #zoom-in-btn, #fullscreen-btn {
+    #zoom-out-btn, #zoom-in-btn {
         display: none !important;
     }
     #toggle-positions-btn, #advanced-settings-btn {
