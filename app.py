@@ -5,6 +5,7 @@ import pandas as pd
 import pandas_ta_classic as ta
 import numpy as np
 import database
+import requests
 from fastapi import FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -85,6 +86,16 @@ async def live_trading_loop():
                 database.save_candles(df.tail(100))
                 
                 active_candle = df.iloc[-1]
+                
+                # Fetch live positions
+                positions = []
+                try:
+                    r = requests.get("http://127.0.0.1:5000/positions", timeout=2)
+                    if r.status_code == 200:
+                        positions = r.json()
+                except Exception as e:
+                    print(f"Failed to fetch positions: {e}")
+
                 await broadcast({
                     'type': 'candle',
                     'data': {
@@ -94,7 +105,8 @@ async def live_trading_loop():
                         'low': float(active_candle['low']),
                         'close': float(active_candle['close']),
                         'volume': float(active_candle['tick_volume'])
-                    }
+                    },
+                    'positions': positions
                 })
                         
         except Exception as e:
@@ -163,6 +175,18 @@ async def websocket_endpoint(websocket: WebSocket):
                             await client.send_text(broadcast_msg)
                         except:
                             pass
+                elif msg.get('type') == 'execute_trade':
+                    try:
+                        r = requests.post("http://127.0.0.1:5000/order", json=msg.get('data', {}), timeout=5)
+                        await websocket.send_text(json.dumps({'type': 'trade_response', 'data': r.json(), 'status': r.status_code}))
+                    except Exception as e:
+                        await websocket.send_text(json.dumps({'type': 'trade_response', 'error': str(e), 'status': 500}))
+                elif msg.get('type') == 'close_trade':
+                    try:
+                        r = requests.post("http://127.0.0.1:5000/close", json=msg.get('data', {}), timeout=5)
+                        await websocket.send_text(json.dumps({'type': 'close_response', 'data': r.json(), 'status': r.status_code}))
+                    except Exception as e:
+                        await websocket.send_text(json.dumps({'type': 'close_response', 'error': str(e), 'status': 500}))
             except Exception as e:
                 print(f"Error processing message: {e}")
     except:
