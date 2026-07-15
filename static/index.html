@@ -56,19 +56,7 @@
                     <button id="zoom-in-btn" style="background:rgba(38,166,154,0.1);border:1px solid rgba(38,166,154,0.2);color:var(--text-secondary,#888);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:14px;margin-right:4px;" title="Zoom In">➕</button>
                     <button id="fullscreen-btn" style="background:none;border:none;color:var(--text-secondary,#888);cursor:pointer;font-size:16px;padding:4px;" title="Toggle Fullscreen">⛶</button>
                     <button id="toggle-positions-btn" style="background:rgba(38,166,154,0.2);border:1px solid rgba(38,166,154,0.3);color:var(--text-secondary,#888);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;font-family:Inter;">Positions</button>
-                    <button id="pos-settings-btn" style="background:rgba(38,166,154,0.2);border:1px solid rgba(38,166,154,0.3);color:var(--text-secondary,#888);padding:4px 6px;border-radius:4px;cursor:pointer;font-size:11px;">&#9881;</button>
-                    <div id="pos-settings-menu" style="display:none;position:absolute;right:10px;top:40px;background:#1a1d26;border:1px solid rgba(42,46,57,0.8);border-radius:6px;padding:8px 12px;z-index:100;font-size:12px;color:#c8c8c8;min-width:140px;">
-                        <div style="font-weight:bold;color:#26a69a;margin-bottom:6px;border-bottom:1px solid rgba(38,166,154,0.3);padding-bottom:2px;">Positions</div>
-                        <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-thick" checked> Thick border</label>
-                        <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-outer" checked> Outer border</label>
-                        <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-prices" checked> Show prices</label>
-                        <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-dash" checked> Entry dash</label>
-                        <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-rr15"> 1.5 R:R line</label>
-                        
-                        <div style="font-weight:bold;color:#FFC107;margin-top:10px;margin-bottom:6px;border-bottom:1px solid rgba(255,193,7,0.3);padding-bottom:2px;">Indicators</div>
-                        <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-sma-line" checked> 200 SMA line</label>
-                        <label style="display:block;margin:4px 0;cursor:pointer;"><input type="checkbox" id="set-sma-label" checked> 200 SMA label</label>
-                    </div>
+                    <button id="advanced-settings-btn" style="background:rgba(38,166,154,0.2);border:1px solid rgba(38,166,154,0.3);color:var(--text-secondary,#888);padding:4px 6px;border-radius:4px;cursor:pointer;font-size:11px;">&#9881;</button>
                     <div id="candle-countdown" class="countdown">00:00</div>
                     <div id="live-badge" class="live-pulse">LIVE</div>
                 </div>
@@ -76,6 +64,115 @@
             <div id="tvchart"></div>
             <button id="mobile-mark-btn" class="mobile-mark-btn">+</button>
         </main>
+    </div>
+
+    <!-- Advanced Settings Modal -->
+    <div id="settings-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Advanced Settings</h2>
+                <button class="modal-close" id="close-settings-btn">×</button>
+            </div>
+            
+            <div class="settings-section">
+                <h3>Position Overlay</h3>
+                <label style="display:block;margin:4px 0;cursor:pointer;font-size:13px;"><input type="checkbox" id="set-thick"> Thick border</label>
+                <label style="display:block;margin:4px 0;cursor:pointer;font-size:13px;"><input type="checkbox" id="set-outer"> Outer border</label>
+                <label style="display:block;margin:4px 0;cursor:pointer;font-size:13px;"><input type="checkbox" id="set-prices"> Show prices</label>
+                <label style="display:block;margin:4px 0;cursor:pointer;font-size:13px;"><input type="checkbox" id="set-dash"> Entry dash</label>
+                <label style="display:block;margin:4px 0;cursor:pointer;font-size:13px;"><input type="checkbox" id="set-rr15"> 1.5 R:R line</label>
+                <label style="display:block;margin:4px 0;cursor:pointer;font-size:13px;"><input type="checkbox" id="set-manual"> Allow manual selection on click</label>
+            </div>
+            
+            <div class="settings-section">
+                <h3>SMA Settings</h3>
+                <div class="setting-row">
+                    <label>Show SMA Line</label>
+                    <input type="checkbox" id="set-sma-line">
+                </div>
+                <div class="setting-row">
+                    <label>Show Price Label</label>
+                    <input type="checkbox" id="set-sma-label">
+                </div>
+                <div class="setting-row">
+                    <label>Length</label>
+                    <input type="number" id="sma-length" min="1" max="1000">
+                </div>
+                <div class="setting-row">
+                    <label>Color</label>
+                    <input type="color" id="sma-color" value="#ffc107">
+                </div>
+                <div class="setting-row">
+                    <label>Line Width</label>
+                    <select id="sma-width">
+                        <option value="1">1px</option>
+                        <option value="2">2px</option>
+                        <option value="3">3px</option>
+                        <option value="4">4px</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="settings-section">
+                <h3>Bollinger Bands</h3>
+                <div class="setting-row">
+                    <label>Show Bollinger Bands</label>
+                    <input type="checkbox" id="set-bb">
+                </div>
+                <div class="setting-row">
+                    <label>Length</label>
+                    <input type="number" id="bb-length" min="1" max="500">
+                </div>
+                <div class="setting-row">
+                    <label>StdDev</label>
+                    <input type="number" id="bb-stddev" min="0.1" max="10" step="0.1">
+                </div>
+                <div class="setting-row">
+                    <label>Upper Color</label>
+                    <input type="color" id="bb-color-upper" value="#ef5350">
+                </div>
+                <div class="setting-row">
+                    <label>Middle Color</label>
+                    <input type="color" id="bb-color-middle" value="#969696">
+                </div>
+                <div class="setting-row">
+                    <label>Lower Color</label>
+                    <input type="color" id="bb-color-lower" value="#26a69a">
+                </div>
+                <div class="setting-row">
+                    <label>Line Width</label>
+                    <select id="bb-width">
+                        <option value="1">1px</option>
+                        <option value="2">2px</option>
+                        <option value="3">3px</option>
+                        <option value="4">4px</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <label>Show Middle Band</label>
+                    <label class="switch">
+                        <input type="checkbox" id="set-bb-middle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-row">
+                    <label>Enable Ribbon Mode (IRCTS)</label>
+                    <label class="switch">
+                        <input type="checkbox" id="set-bb-ribbon">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-row">
+                    <label>Ribbon Step</label>
+                    <input type="number" id="bb-ribbon-step" min="0.1" max="2" step="0.1">
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" id="cancel-settings-btn">Cancel</button>
+                <button class="btn-primary" id="apply-settings-btn">Apply & Save</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -353,29 +450,143 @@
             // --- Visual Trade Position Boxes ---
             let showPositions = false;
             
-            const savedSettings = localStorage.getItem('posSettings');
-            let posSettings = savedSettings ? JSON.parse(savedSettings) : {
-                thick: true, outer: true, prices: true, dash: true, rr15: false, smaLine: true, smaLabel: true
+            const defaultSettings = {
+                pos: { thick: true, outer: true, prices: true, dash: true, rr15: false, allowManual: true },
+                sma: { showLine: true, showLabel: true, length: 200, color: '#ffc107', width: 2 },
+                bb: { show: true, length: 20, stddev: 2, colorUpper: '#ef5350', colorMiddle: '#969696', colorLower: '#26a69a', width: 1, showMiddle: false, ribbon: true, ribbonStep: 0.2 }
             };
             
-            if (posSettings.smaLine === undefined) posSettings.smaLine = true;
-            if (posSettings.smaLabel === undefined) posSettings.smaLabel = posSettings.sma ?? true;
+            let saved = JSON.parse(localStorage.getItem('v10_advanced_settings')) || {};
             
-            ['thick', 'outer', 'prices', 'dash', 'rr15', 'sma-line', 'sma-label'].forEach(key => {
-                const camelKey = key.replace(/-([a-z])/g, g => g[1].toUpperCase());
-                const cb = document.getElementById('set-' + key);
-                if (cb) cb.checked = posSettings[camelKey];
-            });
+            let posSettings = {
+                ...defaultSettings.pos, ...(saved.pos || {})
+            }; 
             
+            let currentSettings = {
+                pos: posSettings,
+                sma: { ...defaultSettings.sma, ...(saved.sma || {}) },
+                bb: { ...defaultSettings.bb, ...(saved.bb || {}) }
+            };
+
+            // Update SMA Series
             smaSeries.applyOptions({ 
-                visible: posSettings.smaLine,
-                lastValueVisible: posSettings.smaLabel,
-                title: posSettings.smaLabel ? '200 SMA' : ''
+                color: currentSettings.sma.color, lineWidth: parseInt(currentSettings.sma.width),
+                visible: currentSettings.sma.showLine,
+                lastValueVisible: currentSettings.sma.showLabel,
+                title: currentSettings.sma.showLabel ? '200 SMA' : ''
             });
+
+            // Add BB Series
+            const bbWidth = parseInt(currentSettings.bb.width);
+            let bbUpperSeriesList = [];
+            let bbLowerSeriesList = [];
             
+            for(let i=0; i<6; i++) {
+                bbUpperSeriesList.push(chart.addLineSeries({ lineWidth: bbWidth, crosshairMarkerVisible: false, priceLineVisible: false, lastValueVisible: false, visible: false }));
+                bbLowerSeriesList.push(chart.addLineSeries({ lineWidth: bbWidth, crosshairMarkerVisible: false, priceLineVisible: false, lastValueVisible: false, visible: false }));
+            }
+            
+            const bbMiddleSeries = chart.addLineSeries({ color: currentSettings.bb.colorMiddle, lineWidth: bbWidth, crosshairMarkerVisible: false, priceLineVisible: false, lastValueVisible: false, visible: currentSettings.bb.show && currentSettings.bb.showMiddle, lineStyle: 2 });
+            
+            function hexToRgba(hex, alpha) {
+                let r = parseInt(hex.slice(1, 3), 16),
+                    g = parseInt(hex.slice(3, 5), 16),
+                    b = parseInt(hex.slice(5, 7), 16);
+                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+            }
+
+            function applyBBSettings() {
+                bbMiddleSeries.applyOptions({ color: currentSettings.bb.colorMiddle, lineWidth: parseInt(currentSettings.bb.width), visible: currentSettings.bb.show && currentSettings.bb.showMiddle });
+                for(let k=0; k<6; k++) {
+                    let alpha = (0.7 - (k * 0.1)).toFixed(2);
+                    let vis = currentSettings.bb.show && (currentSettings.bb.ribbon || k === 0);
+                    bbUpperSeriesList[k].applyOptions({ color: hexToRgba(currentSettings.bb.colorUpper, alpha), lineWidth: parseInt(currentSettings.bb.width), visible: vis });
+                    bbLowerSeriesList[k].applyOptions({ color: hexToRgba(currentSettings.bb.colorLower, alpha), lineWidth: parseInt(currentSettings.bb.width), visible: vis });
+                }
+            }
+            applyBBSettings();
+
+            // UI logic for modal
             const posBtn = document.getElementById('toggle-positions-btn');
-            const posSettingsBtn = document.getElementById('pos-settings-btn');
-            const posSettingsMenu = document.getElementById('pos-settings-menu');
+            const advSettingsBtn = document.getElementById('advanced-settings-btn');
+            const settingsModal = document.getElementById('settings-modal');
+            const closeSettingsBtn = document.getElementById('close-settings-btn');
+            const cancelSettingsBtn = document.getElementById('cancel-settings-btn');
+            const applySettingsBtn = document.getElementById('apply-settings-btn');
+            
+            function syncSettingsUI() {
+                const s = currentSettings;
+                document.getElementById('set-thick').checked = s.pos.thick;
+                document.getElementById('set-outer').checked = s.pos.outer;
+                document.getElementById('set-prices').checked = s.pos.prices;
+                document.getElementById('set-dash').checked = s.pos.dash;
+                document.getElementById('set-rr15').checked = s.pos.rr15;
+                document.getElementById('set-manual').checked = s.pos.allowManual;
+                
+                document.getElementById('set-sma-line').checked = s.sma.showLine;
+                document.getElementById('set-sma-label').checked = s.sma.showLabel;
+                document.getElementById('sma-length').value = s.sma.length;
+                document.getElementById('sma-color').value = s.sma.color;
+                document.getElementById('sma-width').value = s.sma.width;
+                
+                document.getElementById('set-bb').checked = s.bb.show;
+                document.getElementById('bb-length').value = s.bb.length;
+                document.getElementById('bb-stddev').value = s.bb.stddev;
+                document.getElementById('bb-color-upper').value = s.bb.colorUpper;
+                document.getElementById('bb-color-middle').value = s.bb.colorMiddle;
+                document.getElementById('bb-color-lower').value = s.bb.colorLower;
+                document.getElementById('bb-width').value = s.bb.width;
+                document.getElementById('set-bb-middle').checked = s.bb.showMiddle;
+                document.getElementById('set-bb-ribbon').checked = s.bb.ribbon;
+                document.getElementById('bb-ribbon-step').value = s.bb.ribbonStep;
+            }
+            
+            function saveSettings() {
+                currentSettings.pos.thick = document.getElementById('set-thick').checked;
+                currentSettings.pos.outer = document.getElementById('set-outer').checked;
+                currentSettings.pos.prices = document.getElementById('set-prices').checked;
+                currentSettings.pos.dash = document.getElementById('set-dash').checked;
+                currentSettings.pos.rr15 = document.getElementById('set-rr15').checked;
+                currentSettings.pos.allowManual = document.getElementById('set-manual').checked;
+                
+                currentSettings.sma.showLine = document.getElementById('set-sma-line').checked;
+                currentSettings.sma.showLabel = document.getElementById('set-sma-label').checked;
+                currentSettings.sma.length = parseInt(document.getElementById('sma-length').value);
+                currentSettings.sma.color = document.getElementById('sma-color').value;
+                currentSettings.sma.width = document.getElementById('sma-width').value;
+                
+                currentSettings.bb.show = document.getElementById('set-bb').checked;
+                currentSettings.bb.length = parseInt(document.getElementById('bb-length').value);
+                currentSettings.bb.stddev = parseFloat(document.getElementById('bb-stddev').value);
+                currentSettings.bb.colorUpper = document.getElementById('bb-color-upper').value;
+                currentSettings.bb.colorMiddle = document.getElementById('bb-color-middle').value;
+                currentSettings.bb.colorLower = document.getElementById('bb-color-lower').value;
+                currentSettings.bb.width = document.getElementById('bb-width').value;
+                currentSettings.bb.showMiddle = document.getElementById('set-bb-middle').checked;
+                currentSettings.bb.ribbon = document.getElementById('set-bb-ribbon').checked;
+                currentSettings.bb.ribbonStep = parseFloat(document.getElementById('bb-ribbon-step').value);
+                
+                posSettings = currentSettings.pos;
+                localStorage.setItem('v10_advanced_settings', JSON.stringify(currentSettings));
+                
+                // Update Series Options
+                smaSeries.applyOptions({ 
+                    color: currentSettings.sma.color, lineWidth: parseInt(currentSettings.sma.width),
+                    visible: currentSettings.sma.showLine,
+                    lastValueVisible: currentSettings.sma.showLabel,
+                    title: currentSettings.sma.showLabel ? '200 SMA' : ''
+                });
+                
+                applyBBSettings();
+                recalculateIndicators();
+                
+                drawPositionBoxes();
+            }
+            
+            if (advSettingsBtn) advSettingsBtn.addEventListener('click', () => { syncSettingsUI(); settingsModal.classList.add('open'); });
+            if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', () => settingsModal.classList.remove('open'));
+            if (cancelSettingsBtn) cancelSettingsBtn.addEventListener('click', () => settingsModal.classList.remove('open'));
+            if (applySettingsBtn) applySettingsBtn.addEventListener('click', () => { saveSettings(); settingsModal.classList.remove('open'); });
             
             const tradeOverlay = document.createElement('div');
             tradeOverlay.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:3;overflow:hidden;';
@@ -387,35 +598,6 @@
                 posBtn.style.background = showPositions ? 'rgba(38,166,154,0.5)' : 'rgba(38,166,154,0.2)';
                 posBtn.style.color = showPositions ? '#fff' : 'var(--text-secondary, #888)';
                 drawPositionBoxes();
-            });
-            
-            posSettingsBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                posSettingsMenu.style.display = posSettingsMenu.style.display === 'none' ? 'block' : 'none';
-            });
-            
-            document.addEventListener('click', (e) => {
-                if (!posSettingsMenu.contains(e.target) && e.target !== posSettingsBtn) {
-                    posSettingsMenu.style.display = 'none';
-                }
-            });
-            
-            ['thick', 'outer', 'prices', 'dash', 'rr15', 'sma-line', 'sma-label'].forEach(key => {
-                document.getElementById('set-' + key).addEventListener('change', (e) => {
-                    const camelKey = key.replace(/-([a-z])/g, g => g[1].toUpperCase());
-                    posSettings[camelKey] = e.target.checked;
-                    localStorage.setItem('posSettings', JSON.stringify(posSettings));
-                    
-                    if (key === 'sma-line' || key === 'sma-label') {
-                        smaSeries.applyOptions({ 
-                            visible: posSettings.smaLine,
-                            lastValueVisible: posSettings.smaLabel,
-                            title: posSettings.smaLabel ? '200 SMA' : ''
-                        });
-                    } else {
-                        drawPositionBoxes();
-                    }
-                });
             });
             
             function drawPositionBoxes() {
@@ -501,8 +683,56 @@
                 document.getElementById('sidebar').classList.remove('open');
             });
             
+            function recalculateIndicators() {
+                if (!allCandles || allCandles.length === 0) return;
+                
+                const smaLen = currentSettings.sma.length;
+                const smaData = [];
+                for (let i = smaLen - 1; i < allCandles.length; i++) {
+                    let sum = 0;
+                    for (let j = 0; j < smaLen; j++) sum += allCandles[i - j].close;
+                    smaData.push({ time: allCandles[i].time - tzOffset, value: sum / smaLen });
+                }
+                smaSeries.setData(smaData);
+                
+                const bbLen = currentSettings.bb.length;
+                const baseStdDev = currentSettings.bb.stddev;
+                const stepStdDev = currentSettings.bb.ribbonStep;
+                
+                const bbUpperDataList = [[], [], [], [], [], []];
+                const bbLowerDataList = [[], [], [], [], [], []];
+                const bbMiddleData = [];
+                
+                for (let i = bbLen - 1; i < allCandles.length; i++) {
+                    let sum = 0;
+                    for (let j = 0; j < bbLen; j++) sum += allCandles[i - j].close;
+                    const sma = sum / bbLen;
+                    
+                    let sqSum = 0;
+                    for (let j = 0; j < bbLen; j++) sqSum += Math.pow(allCandles[i - j].close - sma, 2);
+                    const stdDev = Math.sqrt(sqSum / bbLen);
+                    
+                    const t = allCandles[i].time - tzOffset;
+                    bbMiddleData.push({ time: t, value: sma });
+                    
+                    for(let k=0; k<6; k++) {
+                        const currentStdDev = baseStdDev + (k * stepStdDev);
+                        bbUpperDataList[k].push({ time: t, value: sma + currentStdDev * stdDev });
+                        bbLowerDataList[k].push({ time: t, value: sma - currentStdDev * stdDev });
+                    }
+                }
+                
+                bbMiddleSeries.setData(bbMiddleData);
+                for(let k=0; k<6; k++) {
+                    bbUpperSeriesList[k].setData(bbUpperDataList[k]);
+                    bbLowerSeriesList[k].setData(bbLowerDataList[k]);
+                }
+            }
+            
             // Manual Clicks
             function handleManualClick(timeParam) {
+                if (!currentSettings.pos.allowManual) return;
+                
                 const timeToUse = timeParam || currentCrosshairTime;
                 if (!timeToUse) return;
                 const dbTime = timeToUse + tzOffset;
@@ -576,15 +806,7 @@
                             updateLegend(allCandles[allCandles.length - 1]);
                         }
                         
-                        const smaData = [];
-                        for (let i = 199; i < localHistory.length; i++) {
-                            let sum = 0;
-                            for (let j = 0; j < 200; j++) {
-                                sum += localHistory[i - j].close;
-                            }
-                            smaData.push({ time: localHistory[i].time, value: sum / 200 });
-                        }
-                        smaSeries.setData(smaData);
+                        recalculateIndicators();
                         
                         const volumeData = msg.data.map(d => ({
                             time: d.time - tzOffset,
@@ -614,12 +836,35 @@
                             updateLegend(allCandles[allCandles.length - 1]);
                         }
                         
-                        if (allCandles.length >= 200) {
+                        const smaLen = currentSettings.sma.length;
+                        if (allCandles.length >= smaLen) {
                             let sum = 0;
-                            for (let j = 0; j < 200; j++) {
+                            for (let j = 0; j < smaLen; j++) {
                                 sum += allCandles[allCandles.length - 1 - j].close;
                             }
-                            smaSeries.update({ time: localCandle.time, value: sum / 200 });
+                            smaSeries.update({ time: localCandle.time, value: sum / smaLen });
+                        }
+                        
+                        const bbLen = currentSettings.bb.length;
+                        const baseStdDev = currentSettings.bb.stddev;
+                        const stepStdDev = currentSettings.bb.ribbonStep;
+                        
+                        if (allCandles.length >= bbLen) {
+                            let sum = 0;
+                            for (let j = 0; j < bbLen; j++) sum += allCandles[allCandles.length - 1 - j].close;
+                            const sma = sum / bbLen;
+                            
+                            let sqSum = 0;
+                            for (let j = 0; j < bbLen; j++) sqSum += Math.pow(allCandles[allCandles.length - 1 - j].close - sma, 2);
+                            const stdDev = Math.sqrt(sqSum / bbLen);
+                            
+                            bbMiddleSeries.update({ time: localCandle.time, value: sma });
+                            
+                            for(let k=0; k<6; k++) {
+                                const currentStdDev = baseStdDev + (k * stepStdDev);
+                                bbUpperSeriesList[k].update({ time: localCandle.time, value: sma + currentStdDev * stdDev });
+                                bbLowerSeriesList[k].update({ time: localCandle.time, value: sma - currentStdDev * stdDev });
+                            }
                         }
 
                         volumeSeries.update({
