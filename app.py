@@ -96,6 +96,15 @@ async def live_trading_loop():
                 except Exception as e:
                     print(f"Failed to fetch positions: {e}")
 
+                # Fetch past deals
+                deals = []
+                try:
+                    r_deals = requests.get("http://127.0.0.1:5000/deals?days=7", timeout=2)
+                    if r_deals.status_code == 200:
+                        deals = r_deals.json()
+                except Exception as e:
+                    print(f"Failed to fetch deals: {e}")
+
                 await broadcast({
                     'type': 'candle',
                     'data': {
@@ -106,7 +115,8 @@ async def live_trading_loop():
                         'close': float(active_candle['close']),
                         'volume': float(active_candle['tick_volume'])
                     },
-                    'positions': positions
+                    'positions': positions,
+                    'deals': deals
                 })
                         
         except Exception as e:

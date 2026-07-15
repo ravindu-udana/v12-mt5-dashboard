@@ -97,6 +97,20 @@
                 <div id="live-trades-list" style="margin-top:10px; font-size:12px; color:#c8c8c8;">
                     <div style="text-align:center; padding:10px; color:rgba(255,255,255,0.3);">No active trades</div>
                 </div>
+                
+                <hr style="border-color: rgba(255,255,255,0.1); margin: 15px 0;">
+                
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h4 style="margin:0; font-size:13px; font-weight:600; color:var(--text-primary);">Past Trades</h4>
+                    <select id="past-trades-filter" style="background:#131722; border:1px solid #2a2e39; color:white; border-radius:4px; font-size:11px; padding:2px;">
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="week">Last 7 Days</option>
+                    </select>
+                </div>
+                <div id="past-trades-list" style="margin-top:10px; font-size:12px; color:#c8c8c8;">
+                    <div style="text-align:center; padding:10px; color:rgba(255,255,255,0.3);">No past trades</div>
+                </div>
             </div>
         </aside>
 
@@ -370,6 +384,8 @@
             let markers = [];
             let allCandles = [];
             let liveTrades = [];
+            let pastTrades = [];
+
             let pendingTradeExecution = null;
 
             let manualSetups = [];
@@ -844,6 +860,77 @@
             // Expose globally
             window.closeLiveTrade = closeLiveTrade;
             
+            
+            function updatePastTradesUI() {
+                const list = document.getElementById('past-trades-list');
+                const filter = document.getElementById('past-trades-filter').value;
+                
+                if (!pastTrades || pastTrades.length === 0) {
+                    list.innerHTML = '<div style="text-align:center; padding:10px; color:rgba(255,255,255,0.3);">No past trades</div>';
+                    return;
+                }
+                
+                // MT5 time is in seconds.
+                const now = new Date();
+                let start_time = 0;
+                
+                if (filter === 'today') {
+                    // Today midnight
+                    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    start_time = Math.floor(today.getTime() / 1000);
+                } else if (filter === 'yesterday') {
+                    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+                    start_time = Math.floor(yesterday.getTime() / 1000);
+                    const end_time = Math.floor(today.getTime() / 1000);
+                    // Filter yesterday only
+                    const filteredTrades = pastTrades.filter(t => t.time >= start_time && t.time < end_time);
+                    renderPastTrades(filteredTrades, list);
+                    return;
+                } else if (filter === 'week') {
+                    const week = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    start_time = Math.floor(week.getTime() / 1000);
+                }
+                
+                const filteredTrades = pastTrades.filter(t => t.time >= start_time);
+                renderPastTrades(filteredTrades, list);
+            }
+            
+            function renderPastTrades(trades, listContainer) {
+                if (trades.length === 0) {
+                    listContainer.innerHTML = '<div style="text-align:center; padding:10px; color:rgba(255,255,255,0.3);">No past trades</div>';
+                    return;
+                }
+                
+                let html = '';
+                trades.forEach(pos => {
+                    const netPnl = pos.profit;
+                    const isProfit = netPnl >= 0;
+                    const color = isProfit ? '#26a69a' : '#ef5350';
+                    const typeStr = pos.type === 0 ? 'BUY' : 'SELL';
+                    
+                    // Format time
+                    const d = new Date(pos.time * 1000);
+                    const timeStr = `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+                    
+                    html += `
+                        <div style="background:rgba(255,255,255,0.05); padding:8px; margin-bottom:8px; border-radius:4px; border-left:3px solid ${color};">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                <strong>${typeStr} ${pos.volume}</strong>
+                                <span style="color:${color}; font-weight:bold; font-size:14px;">$${netPnl.toFixed(2)}</span>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <span style="color:rgba(255,255,255,0.6);">Close: ${pos.price.toFixed(2)}</span>
+                                <span style="color:rgba(255,255,255,0.4); font-size:10px;">${timeStr}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                listContainer.innerHTML = html;
+            }
+            
+            document.getElementById('past-trades-filter').addEventListener('change', updatePastTradesUI);
+
             function updateLiveTradesUI() {
                 const list = document.getElementById('live-trades-list');
                 if (!liveTrades || liveTrades.length === 0) {
@@ -1021,6 +1108,10 @@
                             updateLiveTradesUI();
                             drawPositionBoxes();
                         }
+                        if (msg.deals !== undefined) {
+                            pastTrades = msg.deals;
+                            updatePastTradesUI();
+                        }
                         
                         // Check if we need to execute a pending trade exactly on candle close
                         if (msg.type === 'candle' && pendingTradeExecution) {
@@ -1097,6 +1188,10 @@
                             liveTrades = msg.positions;
                             updateLiveTradesUI();
                             drawPositionBoxes();
+                        }
+                        if (msg.deals !== undefined) {
+                            pastTrades = msg.deals;
+                            updatePastTradesUI();
                         }
                         
                         // Check if we need to execute a pending trade exactly on candle close
