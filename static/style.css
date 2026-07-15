@@ -530,21 +530,22 @@ input:checked + .slider:before { transform: translateX(14px); }
 
 @media (max-width: 768px) {
     .chart-header {
-        flex-direction: column;
-        align-items: flex-start;
-        padding: 10px;
+        flex-direction: row;
+        align-items: center;
+        padding: 8px 12px;
         height: auto;
+        justify-content: space-between;
     }
     
     .chart-header h2 {
-        font-size: 14px;
+        display: none;
     }
     
     .header-right {
-        width: 100%;
-        margin-top: 10px;
-        justify-content: space-between;
-        flex-wrap: wrap;
+        width: auto;
+        margin-top: 0;
+        justify-content: flex-end;
+        flex-wrap: nowrap;
         gap: 8px;
     }
     
