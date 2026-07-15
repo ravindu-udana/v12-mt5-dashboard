@@ -194,8 +194,34 @@ h3 {
     .live-pulse { font-size: 11px; padding: 4px 5px; }
 }
 
+@media (max-width: 768px) {
+    .chart-header {
+        padding: 0 10px;
+    }
+    .header-right {
+        gap: 6px;
+    }
+    #zoom-out-btn, #zoom-in-btn, #fullscreen-btn {
+        display: none !important;
+    }
+    #toggle-positions-btn, #advanced-settings-btn {
+        padding: 4px 6px;
+        font-size: 10px;
+    }
+    .chart-header h2 {
+        font-size: 14px;
+        max-width: 130px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+}
+
 @media (max-width: 480px) {
-    .chart-header h2 { font-size: 14px; }
+    .chart-header h2 { font-size: 12px; max-width: 100px; }
+    .header-right { gap: 4px; }
+    .live-pulse { padding: 4px 6px; font-size: 10px; }
+    .countdown { padding: 4px 4px; font-size: 11px; }
 }
 
 .signal-active .dir {
@@ -262,6 +288,7 @@ h3 {
 
 .chart-header {
     height: 50px;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     padding: 0 20px;
@@ -479,3 +506,69 @@ h3 {
 .slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
 input:checked + .slider { background-color: #26a69a; }
 input:checked + .slider:before { transform: translateX(14px); }
+
+/* Mobile Responsiveness */
+@media (max-width: 1024px) {
+    #app {
+        flex-direction: column;
+    }
+    .ai-panel {
+        position: fixed;
+        left: -320px;
+        top: 0;
+        bottom: 0;
+        transition: left 0.3s ease;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+    }
+    .ai-panel.open {
+        left: 0;
+    }
+    .mobile-toggle, .close-sidebar {
+        display: block;
+    }
+}
+
+@media (max-width: 768px) {
+    .chart-header {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 10px;
+        height: auto;
+    }
+    
+    .chart-header h2 {
+        font-size: 14px;
+    }
+    
+    .header-right {
+        width: 100%;
+        margin-top: 10px;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .mobile-mark-btn {
+        display: flex;
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        width: 50px;
+        height: 50px;
+        border-radius: 25px;
+        background: var(--accent);
+        color: white;
+        font-size: 24px;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        z-index: 100;
+        cursor: pointer;
+    }
+    
+    /* Hide zoom buttons on mobile since pinch-to-zoom works */
+    #zoom-in-btn, #zoom-out-btn {
+        display: none;
+    }
+}
