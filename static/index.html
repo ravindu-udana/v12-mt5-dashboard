@@ -790,6 +790,25 @@
             function executeTradeNow(params) {
                 if (ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({ type: 'execute_trade', data: params }));
+                    
+                    // Optimistic UI Update
+                    const tempTicket = 'temp_' + Date.now();
+                    let currentPrice = 0;
+                    if (allCandles.length > 0) {
+                        currentPrice = allCandles[allCandles.length-1].close;
+                    }
+                    const newTrade = {
+                        ticket: tempTicket,
+                        type: params.action === 'buy' ? 0 : 1, // 0 = buy, 1 = sell in MT5
+                        volume: params.volume,
+                        price_open: currentPrice,
+                        sl: params.sl,
+                        tp: params.tp,
+                        profit: 0
+                    };
+                    liveTrades.push(newTrade);
+                    updateLiveTradesUI();
+                    drawPositionBoxes();
                 }
             }
             
@@ -854,6 +873,11 @@
             function closeLiveTrade(ticket) {
                 if (ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({ type: 'close_trade', data: { ticket } }));
+                    
+                    // Optimistic UI Update
+                    liveTrades = liveTrades.filter(t => String(t.ticket) !== String(ticket));
+                    updateLiveTradesUI();
+                    drawPositionBoxes();
                 }
             }
             
@@ -1244,6 +1268,20 @@
                             });
                         }
                         markers.sort((a, b) => a.time - b.time);
+                    }
+                    else if (msg.type === 'trade_response') {
+                        if (msg.status === 200) {
+                            alert("Trade Executed Successfully!");
+                        } else {
+                            alert("Trade Execution Failed: " + (msg.error || JSON.stringify(msg.data)));
+                        }
+                    }
+                    else if (msg.type === 'close_response') {
+                        if (msg.status === 200) {
+                            alert("Trade Closed Successfully!");
+                        } else {
+                            alert("Trade Close Failed: " + (msg.error || JSON.stringify(msg.data)));
+                        }
                     }
                 } catch(e) {
                     console.error("Message processing error:", e);
