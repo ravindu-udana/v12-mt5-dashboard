@@ -42,6 +42,22 @@ body {
     padding: 20px;
     gap: 24px;
     z-index: 10;
+    overflow-y: auto;
+}
+
+/* Custom scrollbar for sidebar */
+.ai-panel::-webkit-scrollbar {
+    width: 6px;
+}
+.ai-panel::-webkit-scrollbar-track {
+    background: transparent;
+}
+.ai-panel::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+.ai-panel::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.2);
 }
 
 .logo {
