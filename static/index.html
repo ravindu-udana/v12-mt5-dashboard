@@ -450,7 +450,17 @@
                     });
                     
                     manualMarkers.sort((a, b) => a.time - b.time);
-                    candleSeries.setMarkers(manualMarkers);
+                    
+                    let allM = [];
+                    allM.push(...manualMarkers);
+                    if (typeof markers !== 'undefined' && markers) {
+                        allM.push(...markers);
+                    }
+                    if (window.tradeMarkers) {
+                        allM.push(...window.tradeMarkers);
+                    }
+                    allM.sort((a, b) => a.time - b.time);
+                    candleSeries.setMarkers(allM);
                     drawPositionBoxes();
                     updateManualTable(manualSetups);
                 } catch(e) {
@@ -786,9 +796,30 @@
             }
             
 
+            // ---- TOAST NOTIFICATIONS ----
+            const toastContainer = document.createElement('div');
+            toastContainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px;';
+            document.body.appendChild(toastContainer);
+
+            function showToast(message, isError = false) {
+                const toast = document.createElement('div');
+                toast.style.cssText = `background:#131722; border-left:4px solid ${isError ? '#ef5350' : '#26a69a'}; color:white; padding:12px 20px; border-radius:4px; box-shadow:0 4px 6px rgba(0,0,0,0.3); font-size:13px; opacity:0; transform:translateX(100%); transition:all 0.3s ease;`;
+                toast.innerText = message;
+                toastContainer.appendChild(toast);
+                toast.offsetHeight; // trigger reflow
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateX(0)';
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateX(100%)';
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
+            }
+
             // ---- LIVE TRADING LOGIC ----
             function executeTradeNow(params) {
                 if (ws.readyState === WebSocket.OPEN) {
+                    window.lastTradeAction = params.action;
                     ws.send(JSON.stringify({ type: 'execute_trade', data: params }));
                     
                     // Optimistic UI Update
@@ -1271,16 +1302,26 @@
                     }
                     else if (msg.type === 'trade_response') {
                         if (msg.status === 200) {
-                            alert("Trade Executed Successfully!");
+                            showToast(`Order executed @ ${msg.data.price}`);
+                            if (!window.tradeMarkers) window.tradeMarkers = [];
+                            const isBuy = window.lastTradeAction === 'buy';
+                            window.tradeMarkers.push({
+                                time: allCandles[allCandles.length-1].time - tzOffset,
+                                position: isBuy ? 'belowBar' : 'aboveBar',
+                                color: '#2196F3',
+                                shape: isBuy ? 'arrowUp' : 'arrowDown',
+                                text: 'Executed @ ' + msg.data.price
+                            });
+                            updateManualMarkers();
                         } else {
-                            alert("Trade Execution Failed: " + (msg.error || JSON.stringify(msg.data)));
+                            showToast("Trade Execution Failed: " + (msg.error || JSON.stringify(msg.data)), true);
                         }
                     }
                     else if (msg.type === 'close_response') {
                         if (msg.status === 200) {
-                            alert("Trade Closed Successfully!");
+                            showToast("Trade Closed Successfully!");
                         } else {
-                            alert("Trade Close Failed: " + (msg.error || JSON.stringify(msg.data)));
+                            showToast("Trade Close Failed: " + (msg.error || JSON.stringify(msg.data)), true);
                         }
                     }
                 } catch(e) {
