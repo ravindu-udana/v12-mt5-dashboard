@@ -817,25 +817,42 @@
             }
 
             // ---- LIVE TRADING LOGIC ----
+            let _tradeStartTime = 0;
             function executeTradeNow(params) {
                 if (ws.readyState === WebSocket.OPEN) {
+                    _tradeStartTime = performance.now();
                     window.lastTradeAction = params.action;
                     ws.send(JSON.stringify({ type: 'execute_trade', data: params }));
                     
+                    // INSTANT toast feedback
+                    let currentPrice = 0;
+                    if (allCandles.length > 0) currentPrice = allCandles[allCandles.length-1].close;
+                    showToast(`${params.action.toUpperCase()} ${params.volume} @ ${currentPrice.toFixed(2)} — sending...`);
+                    
+                    // Instant chart marker
+                    if (!window.tradeMarkers) window.tradeMarkers = [];
+                    const isBuy = params.action === 'buy';
+                    window.tradeMarkers.push({
+                        time: allCandles[allCandles.length-1].time - tzOffset,
+                        position: isBuy ? 'belowBar' : 'aboveBar',
+                        color: isBuy ? '#26a69a' : '#ef5350',
+                        shape: isBuy ? 'arrowUp' : 'arrowDown',
+                        text: `${params.action.toUpperCase()} @ ${currentPrice.toFixed(2)}`
+                    });
+                    updateManualMarkers();
+                    
                     // Optimistic UI Update
                     const tempTicket = 'temp_' + Date.now();
-                    let currentPrice = 0;
-                    if (allCandles.length > 0) {
-                        currentPrice = allCandles[allCandles.length-1].close;
-                    }
                     const newTrade = {
                         ticket: tempTicket,
-                        type: params.action === 'buy' ? 0 : 1, // 0 = buy, 1 = sell in MT5
+                        type: isBuy ? 0 : 1,
                         volume: params.volume,
                         price_open: currentPrice,
                         sl: params.sl,
                         tp: params.tp,
-                        profit: 0
+                        profit: 0,
+                        time: Math.floor(Date.now() / 1000),
+                        _pending: true
                     };
                     liveTrades.push(newTrade);
                     updateLiveTradesUI();
@@ -901,14 +918,24 @@
             
             document.getElementById('show-chart-positions').addEventListener('change', drawPositionBoxes);
             
+            let _closeStartTime = 0;
             function closeLiveTrade(ticket) {
                 if (ws.readyState === WebSocket.OPEN) {
+                    _closeStartTime = performance.now();
                     ws.send(JSON.stringify({ type: 'close_trade', data: { ticket } }));
                     
-                    // Optimistic UI Update
-                    liveTrades = liveTrades.filter(t => String(t.ticket) !== String(ticket));
+                    // Instant visual: mark as closing
+                    const trade = liveTrades.find(t => String(t.ticket) === String(ticket));
+                    if (trade) trade._closing = true;
+                    showToast('Closing trade...');
                     updateLiveTradesUI();
-                    drawPositionBoxes();
+                    
+                    // Remove after brief flash so user sees it happening
+                    setTimeout(() => {
+                        liveTrades = liveTrades.filter(t => String(t.ticket) !== String(ticket));
+                        updateLiveTradesUI();
+                        drawPositionBoxes();
+                    }, 300);
                 }
             }
             
@@ -993,32 +1020,41 @@
                     return;
                 }
                 
+                // Build new HTML with trade time
                 let html = '';
                 liveTrades.forEach(pos => {
-                    // Spread = 0.1 pip ($1 per lot), Commission = $3.50 per lot.
-                    // Let's assume MT5 raw profit is pos.profit.
-                    // The user wants to deduct $3.50 + $1 = $4.50 per lot manually if MT5 didn't. 
-                    // But user confirmed: "just use MT5's exact profit values which might already factor in your demo account's commissions then"
-                    // So we will just use pos.profit directly!
-                    const netPnl = pos.profit;
+                    const netPnl = pos.profit || 0;
                     const isProfit = netPnl >= 0;
                     const color = isProfit ? '#26a69a' : '#ef5350';
                     const typeStr = pos.type === 0 ? 'BUY' : 'SELL';
+                    const closing = pos._closing ? 'opacity:0.4;' : '';
+                    const pending = pos._pending ? ' ⏳' : '';
+                    
+                    // Format trade time
+                    let timeStr = '';
+                    if (pos.time) {
+                        const d = new Date(pos.time * 1000);
+                        timeStr = d.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12:false});
+                    }
                     
                     html += `
-                        <div style="background:rgba(255,255,255,0.05); padding:8px; margin-bottom:8px; border-radius:4px; border-left:3px solid ${color};">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                <strong>${typeStr} ${pos.volume}</strong>
-                                <span style="color:${color}; font-weight:bold; font-size:14px;">$${netPnl.toFixed(2)}</span>
+                        <div style="background:rgba(255,255,255,0.05); padding:8px; margin-bottom:6px; border-radius:4px; border-left:3px solid ${color}; ${closing}transition:opacity 0.3s;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+                                <strong style="font-size:12px;">${typeStr} ${pos.volume}${pending}</strong>
+                                <span style="color:${color}; font-weight:bold; font-size:13px;">$${netPnl.toFixed(2)}</span>
                             </div>
                             <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <span style="color:rgba(255,255,255,0.6);">Entry: ${pos.price_open.toFixed(2)}</span>
-                                <button onclick="closeLiveTrade(${pos.ticket})" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:white; border-radius:3px; padding:2px 6px; cursor:pointer; font-size:10px;">CLOSE</button>
+                                <span style="color:rgba(255,255,255,0.5); font-size:11px;">@ ${pos.price_open ? pos.price_open.toFixed(2) : '...'} ${timeStr ? '· ' + timeStr : ''}</span>
+                                <button onclick="closeLiveTrade(${pos.ticket})" style="background:rgba(239,83,80,0.15); border:1px solid rgba(239,83,80,0.3); color:#ef5350; border-radius:3px; padding:2px 8px; cursor:pointer; font-size:10px; font-weight:600;">✕</button>
                             </div>
                         </div>
                     `;
                 });
-                list.innerHTML = html;
+                
+                // Only update DOM if content actually changed (prevents flicker)
+                if (list.innerHTML !== html) {
+                    list.innerHTML = html;
+                }
             }
 
             // Sync boxes with chart pan/zoom
@@ -1159,7 +1195,22 @@
                         recalculateIndicators();
                         
                         if (msg.positions !== undefined) {
-                            liveTrades = msg.positions;
+                            // Smart merge: update profits without losing optimistic entries
+                            const serverTickets = new Set(msg.positions.map(p => p.ticket));
+                            // Remove temp trades that now have real tickets
+                            liveTrades = liveTrades.filter(t => !String(t.ticket).startsWith('temp_') || !serverTickets.size);
+                            // Merge: update existing, add new
+                            msg.positions.forEach(sp => {
+                                const existing = liveTrades.find(t => t.ticket === sp.ticket);
+                                if (existing) {
+                                    existing.profit = sp.profit;
+                                    existing.price_current = sp.price_current;
+                                } else {
+                                    liveTrades.push(sp);
+                                }
+                            });
+                            // Remove trades no longer on server (closed by SL/TP)
+                            liveTrades = liveTrades.filter(t => String(t.ticket).startsWith('temp_') || serverTickets.has(t.ticket));
                             updateLiveTradesUI();
                             drawPositionBoxes();
                         }
@@ -1240,7 +1291,19 @@
 
                         
                         if (msg.positions !== undefined) {
-                            liveTrades = msg.positions;
+                            // Smart merge: update profits without losing optimistic entries
+                            const serverTickets = new Set(msg.positions.map(p => p.ticket));
+                            liveTrades = liveTrades.filter(t => !String(t.ticket).startsWith('temp_') || !serverTickets.size);
+                            msg.positions.forEach(sp => {
+                                const existing = liveTrades.find(t => t.ticket === sp.ticket);
+                                if (existing) {
+                                    existing.profit = sp.profit;
+                                    existing.price_current = sp.price_current;
+                                } else {
+                                    liveTrades.push(sp);
+                                }
+                            });
+                            liveTrades = liveTrades.filter(t => String(t.ticket).startsWith('temp_') || serverTickets.has(t.ticket));
                             updateLiveTradesUI();
                             drawPositionBoxes();
                         }
@@ -1301,28 +1364,32 @@
                         markers.sort((a, b) => a.time - b.time);
                     }
                     else if (msg.type === 'trade_response') {
+                        const latency = _tradeStartTime ? ((performance.now() - _tradeStartTime) / 1000).toFixed(2) : '?';
                         if (msg.status === 200) {
-                            showToast(`Order executed @ ${msg.data.price}`);
-                            if (!window.tradeMarkers) window.tradeMarkers = [];
-                            const isBuy = window.lastTradeAction === 'buy';
-                            window.tradeMarkers.push({
-                                time: allCandles[allCandles.length-1].time - tzOffset,
-                                position: isBuy ? 'belowBar' : 'aboveBar',
-                                color: '#2196F3',
-                                shape: isBuy ? 'arrowUp' : 'arrowDown',
-                                text: 'Executed @ ' + msg.data.price
-                            });
-                            updateManualMarkers();
+                            showToast(`✅ Confirmed @ ${msg.data.price} (${latency}s)`);
+                            // Update the marker to confirmed blue
+                            if (window.tradeMarkers && window.tradeMarkers.length > 0) {
+                                const lastMarker = window.tradeMarkers[window.tradeMarkers.length - 1];
+                                lastMarker.color = '#2196F3';
+                                lastMarker.text = `Filled @ ${msg.data.price}`;
+                                updateManualMarkers();
+                            }
                         } else {
-                            showToast("Trade Execution Failed: " + (msg.error || JSON.stringify(msg.data)), true);
+                            showToast("❌ Execution Failed: " + (msg.error || JSON.stringify(msg.data)), true);
+                            // Remove the optimistic marker
+                            if (window.tradeMarkers) window.tradeMarkers.pop();
+                            updateManualMarkers();
                         }
+                        _tradeStartTime = 0;
                     }
                     else if (msg.type === 'close_response') {
+                        const latency = _closeStartTime ? ((performance.now() - _closeStartTime) / 1000).toFixed(2) : '?';
                         if (msg.status === 200) {
-                            showToast("Trade Closed Successfully!");
+                            showToast(`✅ Trade closed (${latency}s)`);
                         } else {
-                            showToast("Trade Close Failed: " + (msg.error || JSON.stringify(msg.data)), true);
+                            showToast("❌ Close Failed: " + (msg.error || JSON.stringify(msg.data)), true);
                         }
+                        _closeStartTime = 0;
                     }
                 } catch(e) {
                     console.error("Message processing error:", e);
