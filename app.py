@@ -6,6 +6,7 @@ import pandas_ta_classic as ta
 import numpy as np
 import database
 import requests
+from functools import partial
 from fastapi import FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -87,19 +88,19 @@ async def live_trading_loop():
                 
                 active_candle = df.iloc[-1]
                 
-                # Fetch live positions
+                # Fetch live positions (non-blocking)
                 positions = []
                 try:
-                    r = requests.get("http://127.0.0.1:5000/positions", timeout=2)
+                    r = await asyncio.to_thread(partial(requests.get, "http://127.0.0.1:5000/positions", timeout=2))
                     if r.status_code == 200:
                         positions = r.json()
                 except Exception as e:
                     print(f"Failed to fetch positions: {e}")
 
-                # Fetch past deals
+                # Fetch past deals (non-blocking)
                 deals = []
                 try:
-                    r_deals = requests.get("http://127.0.0.1:5000/deals?days=7", timeout=2)
+                    r_deals = await asyncio.to_thread(partial(requests.get, "http://127.0.0.1:5000/deals?days=7", timeout=2))
                     if r_deals.status_code == 200:
                         deals = r_deals.json()
                 except Exception as e:
@@ -187,13 +188,13 @@ async def websocket_endpoint(websocket: WebSocket):
                             pass
                 elif msg.get('type') == 'execute_trade':
                     try:
-                        r = requests.post("http://127.0.0.1:5001/order", json=msg.get('data', {}), timeout=5)
+                        r = await asyncio.to_thread(partial(requests.post, "http://127.0.0.1:5001/order", json=msg.get('data', {}), timeout=5))
                         await websocket.send_text(json.dumps({'type': 'trade_response', 'data': r.json(), 'status': r.status_code}))
                     except Exception as e:
                         await websocket.send_text(json.dumps({'type': 'trade_response', 'error': str(e), 'status': 500}))
                 elif msg.get('type') == 'close_trade':
                     try:
-                        r = requests.post("http://127.0.0.1:5001/close", json=msg.get('data', {}), timeout=5)
+                        r = await asyncio.to_thread(partial(requests.post, "http://127.0.0.1:5001/close", json=msg.get('data', {}), timeout=5))
                         await websocket.send_text(json.dumps({'type': 'close_response', 'data': r.json(), 'status': r.status_code}))
                     except Exception as e:
                         await websocket.send_text(json.dumps({'type': 'close_response', 'error': str(e), 'status': 500}))
