@@ -188,13 +188,13 @@ async def websocket_endpoint(websocket: WebSocket):
                             pass
                 elif msg.get('type') == 'execute_trade':
                     try:
-                        r = await asyncio.to_thread(partial(requests.post, "http://127.0.0.1:5001/order", json=msg.get('data', {}), timeout=5))
+                        r = await asyncio.to_thread(partial(requests.post, "http://127.0.0.1:5000/order", json=msg.get('data', {}), timeout=30))
                         await websocket.send_text(json.dumps({'type': 'trade_response', 'data': r.json(), 'status': r.status_code}))
                     except Exception as e:
                         await websocket.send_text(json.dumps({'type': 'trade_response', 'error': str(e), 'status': 500}))
                 elif msg.get('type') == 'close_trade':
                     try:
-                        r = await asyncio.to_thread(partial(requests.post, "http://127.0.0.1:5001/close", json=msg.get('data', {}), timeout=5))
+                        r = await asyncio.to_thread(partial(requests.post, "http://127.0.0.1:5000/close", json=msg.get('data', {}), timeout=30))
                         await websocket.send_text(json.dumps({'type': 'close_response', 'data': r.json(), 'status': r.status_code}))
                     except Exception as e:
                         await websocket.send_text(json.dumps({'type': 'close_response', 'error': str(e), 'status': 500}))
